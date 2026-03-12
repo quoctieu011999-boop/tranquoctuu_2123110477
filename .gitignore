@@ -361,3 +361,5 @@ MigrationBackup/
 
 # Fody - auto-generated XML schema
 FodyWeavers.xsd
+/tranquoctuu_2123110477/Controllers/CategoryController.cs
+/tranquoctuu_2123110477/Controllers/ProductController.cs
