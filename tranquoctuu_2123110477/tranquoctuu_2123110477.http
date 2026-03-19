@@ -1,0 +1,6 @@
+@tranquoctuu_2123110477_HostAddress = http://localhost:5224
+
+GET {{tranquoctuu_2123110477_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###
