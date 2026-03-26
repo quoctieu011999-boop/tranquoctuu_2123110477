@@ -1,8 +1,11 @@
 ﻿using System.ComponentModel.DataAnnotations;
-namespace ConnectDB.Models;
+using ConnectDB.Models;
+
+namespace tranquoctuu_2123110477.Models;
 
 public class Customer
 {
+    [Key]
     public int Id { get; set; }
     public string Name { get; set; }
     public string Phone { get; set; }
@@ -12,5 +15,6 @@ public class Customer
     public string Level { get; set; }
     public DateTime CreatedAt { get; set; } = DateTime.Now;
 
-    public ICollection<Order> Orders { get; set; }
+
+    public ICollection<Order>? Orders { get; set; }
 }

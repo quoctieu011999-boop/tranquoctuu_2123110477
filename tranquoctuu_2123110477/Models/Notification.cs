@@ -1,5 +1,5 @@
 ﻿using System.ComponentModel.DataAnnotations;
-namespace ConnectDB.Models;
+namespace tranquoctuu_2123110477.Models;
 
 public class Notification
 {
