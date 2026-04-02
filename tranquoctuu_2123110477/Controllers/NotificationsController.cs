@@ -16,72 +16,105 @@ namespace tranquoctuu_2123110477.Controllers
             _context = context;
         }
 
- 
+        
         [HttpGet]
         public async Task<ActionResult<IEnumerable<Notification>>> GetNotifications()
         {
             return await _context.Notifications
-                                 .Include(n => n.Customer)
-                                 .OrderByDescending(n => n.CreatedAt)
-                                 .ToListAsync();
+                .Where(x => !x.IsDeleted)
+                .Include(x => x.Customer)
+                .OrderByDescending(x => x.CreatedAt)
+                .ToListAsync();
         }
 
-        
+    
         [HttpGet("{id}")]
         public async Task<ActionResult<Notification>> GetNotification(int id)
         {
-            var notification = await _context.Notifications
-                                             .Include(n => n.Customer)
-                                             .FirstOrDefaultAsync(n => n.Id == id);
+            var data = await _context.Notifications
+                .Include(x => x.Customer)
+                .FirstOrDefaultAsync(x => x.Id == id && !x.IsDeleted);
 
-            if (notification == null)
-            {
-                return NotFound($"Không tìm thấy thông báo với Id = {id}");
-            }
+            if (data == null)
+                return NotFound($"Không tìm thấy Id = {id}");
 
-            return notification;
-        }
-
-      
-        [HttpPost]
-        public async Task<ActionResult<Notification>> PostNotification(Notification notification)
-        {
-            notification.CreatedAt = DateTime.Now;
-            _context.Notifications.Add(notification);
-            await _context.SaveChangesAsync();
-
-            return CreatedAtAction(nameof(GetNotification), new { id = notification.Id }, notification);
-        }
-
-      
-        [HttpPatch("{id}/mark-as-sent")]
-        public async Task<IActionResult> MarkAsSent(int id)
-        {
-            var notification = await _context.Notifications.FindAsync(id);
-            if (notification == null) return NotFound();
-
-            notification.IsSent = true;
-            await _context.SaveChangesAsync();
-
-            return NoContent();
+            return data;
         }
 
        
-        [HttpDelete("{id}")]
-        public async Task<IActionResult> DeleteNotification(int id)
+        [HttpPost]
+        public async Task<ActionResult<Notification>> Create(Notification model)
         {
-            var notification = await _context.Notifications.FindAsync(id);
-            if (notification == null) return NotFound();
+            model.CreatedAt = DateTime.Now;
+            model.CreatedBy = "admin";
 
-            _context.Notifications.Remove(notification);
+            _context.Notifications.Add(model);
+            await _context.SaveChangesAsync();
+
+            return CreatedAtAction(nameof(GetNotification), new { id = model.Id }, model);
+        }
+
+        
+        [HttpPut("{id}")]
+        public async Task<IActionResult> Update(int id, Notification model)
+        {
+            if (id != model.Id)
+                return BadRequest("Id không khớp");
+
+            var existing = await _context.Notifications.FindAsync(id);
+            if (existing == null || existing.IsDeleted)
+                return NotFound();
+
+            existing.Title = model.Title;
+            existing.Message = model.Message;
+            existing.CustomerId = model.CustomerId;
+
+            existing.UpdatedAt = DateTime.Now;
+            existing.UpdatedBy = "admin";
+
             await _context.SaveChangesAsync();
 
             return NoContent();
         }
 
-        private bool NotificationExists(int id)
+    
+        [HttpPatch("{id}/mark-as-sent")]
+        public async Task<IActionResult> MarkAsSent(int id)
         {
-            return _context.Notifications.Any(e => e.Id == id);
+            var data = await _context.Notifications.FindAsync(id);
+            if (data == null || data.IsDeleted)
+                return NotFound();
+
+            data.IsSent = true;
+
+            data.UpdatedAt = DateTime.Now;
+            data.UpdatedBy = "admin";
+
+            await _context.SaveChangesAsync();
+
+            return NoContent();
+        }
+
+      
+        [HttpDelete("{id}")]
+        public async Task<IActionResult> Delete(int id)
+        {
+            var data = await _context.Notifications.FindAsync(id);
+            if (data == null || data.IsDeleted)
+                return NotFound();
+
+            data.IsDeleted = true;
+            data.DeletedAt = DateTime.Now;
+            data.DeletedBy = "admin";
+
+            await _context.SaveChangesAsync();
+
+            return NoContent();
+        }
+
+        private bool Exists(int id)
+        {
+            return _context.Notifications.Any(e => e.Id == id && !e.IsDeleted);
         }
     }
 }

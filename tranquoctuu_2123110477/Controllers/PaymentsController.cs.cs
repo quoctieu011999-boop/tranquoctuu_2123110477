@@ -16,87 +16,110 @@ namespace tranquoctuu_2123110477.Controllers
             _context = context;
         }
 
-        
+     
         [HttpGet]
         public async Task<ActionResult<IEnumerable<Payment>>> GetPayments()
         {
             return await _context.Payments
-                                 .Include(p => p.Order)
-                                 .OrderByDescending(p => p.CreatedAt)
-                                 .ToListAsync();
+                .Where(x => !x.IsDeleted)
+                .Include(x => x.Order)
+                .OrderByDescending(x => x.CreatedAt)
+                .ToListAsync();
         }
 
       
         [HttpGet("{id}")]
         public async Task<ActionResult<Payment>> GetPayment(int id)
         {
-            var payment = await _context.Payments
-                                        .Include(p => p.Order)
-                                        .FirstOrDefaultAsync(p => p.Id == id);
+            var data = await _context.Payments
+                .Include(x => x.Order)
+                .FirstOrDefaultAsync(x => x.Id == id && !x.IsDeleted);
 
-            if (payment == null)
-            {
-                return NotFound($"Không tìm thấy thông tin thanh toán với Id = {id}");
-            }
+            if (data == null)
+                return NotFound($"Không tìm thấy Payment Id = {id}");
 
-            return payment;
-        }
-
-      
-        [HttpPost]
-        public async Task<ActionResult<Payment>> PostPayment(Payment payment)
-        {
-           
-            var orderExists = await _context.Orders.AnyAsync(o => o.Id == payment.OrderId);
-            if (!orderExists)
-            {
-                return BadRequest("Mã đơn hàng (OrderId) không tồn tại.");
-            }
-
-            payment.CreatedAt = DateTime.Now;
-            _context.Payments.Add(payment);
-            await _context.SaveChangesAsync();
-
-            return CreatedAtAction(nameof(GetPayment), new { id = payment.Id }, payment);
-        }
-
-       
-        [HttpPut("{id}")]
-        public async Task<IActionResult> PutPayment(int id, Payment payment)
-        {
-            if (id != payment.Id) return BadRequest();
-
-            _context.Entry(payment).State = EntityState.Modified;
-
-            try
-            {
-                await _context.SaveChangesAsync();
-            }
-            catch (DbUpdateConcurrencyException)
-            {
-                if (!PaymentExists(id)) return NotFound();
-                else throw;
-            }
-
-            return NoContent();
+            return data;
         }
 
         
-        [HttpDelete("{id}")]
-        public async Task<IActionResult> DeletePayment(int id)
+        [HttpPost]
+        public async Task<ActionResult<Payment>> Create(Payment model)
         {
-            var payment = await _context.Payments.FindAsync(id);
-            if (payment == null) return NotFound();
+            var order = await _context.Orders
+                .FirstOrDefaultAsync(o => o.Id == model.OrderId && !o.IsDeleted);
 
-            _context.Payments.Remove(payment);
+            if (order == null)
+                return BadRequest("Order không tồn tại");
+
+            model.CreatedAt = DateTime.Now;
+            model.CreatedBy = "admin";
+            model.Status = "Pending";
+
+           
+            if (model.Amount <= 0)
+                return BadRequest("Số tiền không hợp lệ");
+
+            _context.Payments.Add(model);
+
+            await _context.SaveChangesAsync();
+
+            return CreatedAtAction(nameof(GetPayment), new { id = model.Id }, model);
+        }
+
+      
+        [HttpPut("{id}")]
+        public async Task<IActionResult> Update(int id, Payment model)
+        {
+            if (id != model.Id)
+                return BadRequest("Id không khớp");
+
+            var existing = await _context.Payments
+                .Include(x => x.Order)
+                .FirstOrDefaultAsync(x => x.Id == id);
+
+            if (existing == null || existing.IsDeleted)
+                return NotFound();
+
+            existing.Amount = model.Amount;
+            existing.Method = model.Method;
+            existing.Status = model.Status;
+
+            existing.UpdatedAt = DateTime.Now;
+            existing.UpdatedBy = "admin";
+
+           
+            if (model.Status == "Success")
+            {
+                existing.Order.Status = "Completed";
+                existing.Order.UpdatedAt = DateTime.Now;
+            }
+
             await _context.SaveChangesAsync();
 
             return NoContent();
         }
 
-        private bool PaymentExists(int id)
+
+        [HttpDelete("{id}")]
+        public async Task<IActionResult> Delete(int id)
         {
-            return _context.Payments.Any(e => e.Id == id);
+            var data = await _context.Payments.FindAsync(id);
+
+            if (data == null || data.IsDeleted)
+                return NotFound();
+
+            data.IsDeleted = true;
+            data.DeletedAt = DateTime.Now;
+            data.DeletedBy = "admin";
+
+            await _context.SaveChangesAsync();
+
+            return NoContent();
+        }
+
+        private bool Exists(int id)
+        {
+            return _context.Payments.Any(e => e.Id == id && !e.IsDeleted);
         }
     }
 }

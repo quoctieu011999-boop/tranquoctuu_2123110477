@@ -1,14 +1,15 @@
-﻿using System.ComponentModel.DataAnnotations;
-namespace tranquoctuu_2123110477.Models;
+﻿using tranquoctuu_2123110477.Models;
 
-public class OrderItem
+public class OrderItem : BaseEntity
 {
     public int Id { get; set; }
+
     public int OrderId { get; set; }
-    public string ProductName { get; set; }
+    public int ProductId { get; set; }
+
     public int Quantity { get; set; }
     public decimal Price { get; set; }
 
-    public Order Order { get; set; }
+    public Order? Order { get; set; }
+    public Product? Product { get; set; }
 }
-

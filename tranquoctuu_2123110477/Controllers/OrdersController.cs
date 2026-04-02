@@ -16,83 +16,142 @@ namespace tranquoctuu_2123110477.Controllers
             _context = context;
         }
 
-        
+    
         [HttpGet]
         public async Task<ActionResult<IEnumerable<Order>>> GetOrders()
         {
             return await _context.Orders
-                                 .Include(o => o.Customer)
-                                 .Include(o => o.OrderItems)
-                                 .OrderByDescending(o => o.CreatedAt)
-                                 .ToListAsync();
+                .Where(x => !x.IsDeleted)
+                .Include(x => x.Customer)
+                .Include(x => x.OrderItems.Where(i => !i.IsDeleted))
+                .OrderByDescending(x => x.CreatedAt)
+                .ToListAsync();
         }
 
         
         [HttpGet("{id}")]
         public async Task<ActionResult<Order>> GetOrder(int id)
         {
-            var order = await _context.Orders
-                                      .Include(o => o.Customer)
-                                      .Include(o => o.OrderItems)
-                                      .FirstOrDefaultAsync(o => o.Id == id);
+            var data = await _context.Orders
+                .Include(x => x.Customer)
+                .Include(x => x.OrderItems.Where(i => !i.IsDeleted))
+                .FirstOrDefaultAsync(x => x.Id == id && !x.IsDeleted);
 
-            if (order == null)
+            if (data == null)
+                return NotFound($"Không tìm thấy đơn hàng Id = {id}");
+
+            return data;
+        }
+
+       
+        [HttpPost]
+        public async Task<ActionResult<Order>> Create(Order model)
+        {
+            model.CreatedAt = DateTime.Now;
+            model.CreatedBy = "admin";
+            model.Status = "Pending";
+
+         
+            if (model.OrderItems != null && model.OrderItems.Any())
             {
-                return NotFound($"Không tìm thấy đơn hàng với Id = {id}");
+                model.TotalAmount = model.OrderItems
+                    .Sum(i => i.Price * i.Quantity);
+
+                foreach (var item in model.OrderItems)
+                {
+                    item.CreatedAt = DateTime.Now;
+                    item.CreatedBy = "admin";
+                }
             }
 
-            return order;
+            _context.Orders.Add(model);
+            await _context.SaveChangesAsync();
+
+            return CreatedAtAction(nameof(GetOrder), new { id = model.Id }, model);
+        }
+
+     
+        [HttpPut("{id}")]
+        public async Task<IActionResult> Update(int id, Order model)
+        {
+            if (id != model.Id)
+                return BadRequest("Id không khớp");
+
+            var existing = await _context.Orders
+                .Include(x => x.OrderItems)
+                .FirstOrDefaultAsync(x => x.Id == id);
+
+            if (existing == null || existing.IsDeleted)
+                return NotFound();
+
+            
+            existing.CustomerId = model.CustomerId;
+            existing.Status = model.Status;
+
+           
+            if (model.OrderItems != null)
+            {
+              
+                foreach (var old in existing.OrderItems)
+                {
+                    old.IsDeleted = true;
+                    old.DeletedAt = DateTime.Now;
+                    old.DeletedBy = "admin";
+                }
+
+                
+                existing.OrderItems = model.OrderItems;
+
+                foreach (var item in existing.OrderItems)
+                {
+                    item.CreatedAt = DateTime.Now;
+                    item.CreatedBy = "admin";
+                }
+
+                
+                existing.TotalAmount = existing.OrderItems
+                    .Sum(i => i.Price * i.Quantity);
+            }
+
+            existing.UpdatedAt = DateTime.Now;
+            existing.UpdatedBy = "admin";
+
+            await _context.SaveChangesAsync();
+
+            return NoContent();
         }
 
       
-        [HttpPost]
-        public async Task<ActionResult<Order>> PostOrder(Order order)
-        {
-            order.CreatedAt = DateTime.Now;
-            _context.Orders.Add(order);
-            await _context.SaveChangesAsync();
-
-            return CreatedAtAction(nameof(GetOrder), new { id = order.Id }, order);
-        }
-
-        
-        [HttpPut("{id}")]
-        public async Task<IActionResult> PutOrder(int id, Order order)
-        {
-            if (id != order.Id) return BadRequest();
-
-            _context.Entry(order).State = EntityState.Modified;
-
-            try
-            {
-                await _context.SaveChangesAsync();
-            }
-            catch (DbUpdateConcurrencyException)
-            {
-                if (!OrderExists(id)) return NotFound();
-                else throw;
-            }
-
-            return NoContent();
-        }
-
-        // DELETE: api/Orders/5
         [HttpDelete("{id}")]
-        public async Task<IActionResult> DeleteOrder(int id)
+        public async Task<IActionResult> Delete(int id)
         {
-            var order = await _context.Orders.FindAsync(id);
-            if (order == null) return NotFound();
+            var data = await _context.Orders
+                .Include(x => x.OrderItems)
+                .FirstOrDefaultAsync(x => x.Id == id);
 
-            
-            _context.Orders.Remove(order);
+            if (data == null || data.IsDeleted)
+                return NotFound();
+
+            data.IsDeleted = true;
+            data.DeletedAt = DateTime.Now;
+            data.DeletedBy = "admin";
+
+           
+            foreach (var item in data.OrderItems)
+            {
+                item.IsDeleted = true;
+                item.DeletedAt = DateTime.Now;
+                item.DeletedBy = "admin";
+            }
+
             await _context.SaveChangesAsync();
 
             return NoContent();
         }
 
-        private bool OrderExists(int id)
+        private bool Exists(int id)
         {
-            return _context.Orders.Any(e => e.Id == id);
+            return _context.Orders.Any(e => e.Id == id && !e.IsDeleted);
         }
     }
 }

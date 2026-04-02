@@ -2,20 +2,21 @@
 
 namespace tranquoctuu_2123110477.Models
 {
-    public class Reward : BaseEntity
+    public class Product : BaseEntity
     {
         public int Id { get; set; }
 
         public string Name { get; set; }
 
+        public decimal Price { get; set; }
+
+        public int Stock { get; set; }
+
         public string Description { get; set; }
-
-        public int PointCost { get; set; } 
-
-        public int Quantity { get; set; } = 0;
 
         public bool IsDeleted { get; set; } = false;
 
-        public List<Redemption> Redemptions { get; set; }
+        
+        public List<OrderItem>? OrderItems { get; set; }
     }
 }

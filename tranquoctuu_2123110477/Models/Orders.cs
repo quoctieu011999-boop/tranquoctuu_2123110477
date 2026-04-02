@@ -1,17 +1,21 @@
-﻿
-using System.ComponentModel.DataAnnotations;
-namespace tranquoctuu_2123110477.Models;
+﻿using System.ComponentModel.DataAnnotations;
 
-public class Order
+namespace tranquoctuu_2123110477.Models
+{
+    public class Order : BaseEntity
     {
         public int Id { get; set; }
+
         public int CustomerId { get; set; }
-        public decimal TotalAmount { get; set; }
-        public string Channel { get; set; }
-        public string Status { get; set; }
-        public DateTime CreatedAt { get; set; } = DateTime.Now;
 
+        public decimal TotalAmount { get; set; } = 0;
+
+        public string Status { get; set; } 
+
+        public bool IsDeleted { get; set; } = false;
+
+        
         public Customer Customer { get; set; }
-        public ICollection<OrderItem> OrderItems { get; set; }
+        public List<OrderItem> OrderItems { get; set; }
     }
-
+}

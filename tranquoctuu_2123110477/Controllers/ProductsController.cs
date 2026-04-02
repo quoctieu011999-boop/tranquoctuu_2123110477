@@ -7,103 +7,89 @@ namespace tranquoctuu_2123110477.Controllers
 {
     [Route("api/[controller]")]
     [ApiController]
-    public class RewardsController : ControllerBase
+    public class ProductsController : ControllerBase
     {
         private readonly AppDbContext _context;
 
-        public RewardsController(AppDbContext context)
+        public ProductsController(AppDbContext context)
         {
             _context = context;
         }
 
-   
+
         [HttpGet]
-        public async Task<ActionResult<IEnumerable<Reward>>> GetRewards()
+        public async Task<ActionResult<IEnumerable<Product>>> GetProducts()
         {
-            return await _context.Rewards
+            return await _context.Products
                 .Where(x => !x.IsDeleted)
                 .OrderByDescending(x => x.CreatedAt)
                 .ToListAsync();
         }
 
-    
+
         [HttpGet("{id}")]
-        public async Task<ActionResult<Reward>> GetReward(int id)
+        public async Task<ActionResult<Product>> GetProduct(int id)
         {
-            var data = await _context.Rewards
+            var data = await _context.Products
                 .FirstOrDefaultAsync(x => x.Id == id && !x.IsDeleted);
 
             if (data == null)
-                return NotFound($"Không tìm thấy Reward Id = {id}");
+                return NotFound();
 
             return data;
         }
 
-       
+
         [HttpPost]
-        public async Task<ActionResult<Reward>> Create(Reward model)
+        public async Task<ActionResult<Product>> Create(Product model)
         {
-            if (model.PointCost <= 0)
-                return BadRequest("PointCost phải > 0");
-
-            if (model.Quantity < 0)
-                return BadRequest("Quantity không hợp lệ");
-
             model.CreatedAt = DateTime.Now;
             model.CreatedBy = "admin";
 
-            _context.Rewards.Add(model);
+            _context.Products.Add(model);
             await _context.SaveChangesAsync();
 
-            return CreatedAtAction(nameof(GetReward), new { id = model.Id }, model);
+            return CreatedAtAction(nameof(GetProduct), new { id = model.Id }, model);
         }
 
-        
-        [HttpPut("{id}")]
-        public async Task<IActionResult> Update(int id, Reward model)
-        {
-            if (id != model.Id)
-                return BadRequest("Id không khớp");
 
-            var existing = await _context.Rewards.FindAsync(id);
+        [HttpPut("{id}")]
+        public async Task<IActionResult> Update(int id, Product model)
+        {
+            if (id != model.Id) return BadRequest();
+
+            var existing = await _context.Products.FindAsync(id);
 
             if (existing == null || existing.IsDeleted)
                 return NotFound();
 
             existing.Name = model.Name;
+            existing.Price = model.Price;
+            existing.Stock = model.Stock;
             existing.Description = model.Description;
-            existing.PointCost = model.PointCost;
-            existing.Quantity = model.Quantity;
 
             existing.UpdatedAt = DateTime.Now;
-            existing.UpdatedBy = "admin";
 
             await _context.SaveChangesAsync();
 
             return NoContent();
         }
 
-        
+
         [HttpDelete("{id}")]
         public async Task<IActionResult> Delete(int id)
         {
-            var data = await _context.Rewards.FindAsync(id);
+            var data = await _context.Products.FindAsync(id);
 
             if (data == null || data.IsDeleted)
                 return NotFound();
 
             data.IsDeleted = true;
             data.DeletedAt = DateTime.Now;
-            data.DeletedBy = "admin";
 
             await _context.SaveChangesAsync();
 
             return NoContent();
-        }
-
-        private bool Exists(int id)
-        {
-            return _context.Rewards.Any(e => e.Id == id && !e.IsDeleted);
         }
     }
 }

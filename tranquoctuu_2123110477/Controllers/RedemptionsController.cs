@@ -16,88 +16,108 @@ namespace tranquoctuu_2123110477.Controllers
             _context = context;
         }
 
-      
+        
         [HttpGet]
         public async Task<ActionResult<IEnumerable<Redemption>>> GetRedemptions()
         {
             return await _context.Redemptions
-                                 .Include(r => r.Customer)
-                                 .Include(r => r.Reward)
-                                 .ToListAsync();
+                .Where(x => !x.IsDeleted)
+                .Include(x => x.Customer)
+                .Include(x => x.Reward)
+                .OrderByDescending(x => x.CreatedAt)
+                .ToListAsync();
         }
 
+        
         [HttpGet("{id}")]
         public async Task<ActionResult<Redemption>> GetRedemption(int id)
         {
-            var redemption = await _context.Redemptions
-                                           .Include(r => r.Customer)
-                                           .Include(r => r.Reward)
-                                           .FirstOrDefaultAsync(r => r.Id == id);
+            var data = await _context.Redemptions
+                .Include(x => x.Customer)
+                .Include(x => x.Reward)
+                .FirstOrDefaultAsync(x => x.Id == id && !x.IsDeleted);
 
-            if (redemption == null)
-            {
-                return NotFound($"Không tìm thấy giao dịch đổi quà với Id = {id}");
-            }
+            if (data == null)
+                return NotFound($"Không tìm thấy Redemption Id = {id}");
 
-            return redemption;
+            return data;
         }
 
-      
+        
         [HttpPost]
-        public async Task<ActionResult<Redemption>> PostRedemption(Redemption redemption)
+        public async Task<ActionResult<Redemption>> Create(Redemption model)
         {
+            var customer = await _context.Customers
+                .FirstOrDefaultAsync(c => c.Id == model.CustomerId);
+
+            var reward = await _context.Rewards
+                .FirstOrDefaultAsync(r => r.Id == model.RewardId);
+
+            if (customer == null || reward == null)
+                return BadRequest("Customer hoặc Reward không tồn tại");
+
             
-            var customerExists = await _context.Customers.AnyAsync(c => c.Id == redemption.CustomerId);
-            var rewardExists = await _context.Rewards.AnyAsync(rw => rw.Id == redemption.RewardId);
+            if (customer.Points < reward.PointCost)
+                return BadRequest("Không đủ điểm để đổi quà");
 
-            if (!customerExists || !rewardExists)
-            {
-                return BadRequest("CustomerId hoặc RewardId không hợp lệ.");
-            }
+            model.PointsUsed = reward.PointCost;
+            model.Status = "Completed";
+            model.CreatedAt = DateTime.Now;
+            model.CreatedBy = "admin";
 
-            _context.Redemptions.Add(redemption);
+          
+            customer.Points -= reward.PointCost;
+            customer.UpdatedAt = DateTime.Now;
+
+            _context.Redemptions.Add(model);
             await _context.SaveChangesAsync();
 
-            return CreatedAtAction(nameof(GetRedemption), new { id = redemption.Id }, redemption);
+            return CreatedAtAction(nameof(GetRedemption), new { id = model.Id }, model);
         }
 
-    
+        
         [HttpPut("{id}")]
-        public async Task<IActionResult> PutRedemption(int id, Redemption redemption)
+        public async Task<IActionResult> Update(int id, Redemption model)
         {
-            if (id != redemption.Id) return BadRequest();
+            if (id != model.Id)
+                return BadRequest("Id không khớp");
 
-            _context.Entry(redemption).State = EntityState.Modified;
+            var existing = await _context.Redemptions.FindAsync(id);
 
-            try
-            {
-                await _context.SaveChangesAsync();
-            }
-            catch (DbUpdateConcurrencyException)
-            {
-                if (!RedemptionExists(id)) return NotFound();
-                else throw;
-            }
+            if (existing == null || existing.IsDeleted)
+                return NotFound();
 
-            return NoContent();
-        }
+            existing.Status = model.Status;
 
-     
-        [HttpDelete("{id}")]
-        public async Task<IActionResult> DeleteRedemption(int id)
-        {
-            var redemption = await _context.Redemptions.FindAsync(id);
-            if (redemption == null) return NotFound();
+            existing.UpdatedAt = DateTime.Now;
+            existing.UpdatedBy = "admin";
 
-            _context.Redemptions.Remove(redemption);
             await _context.SaveChangesAsync();
 
             return NoContent();
         }
 
-        private bool RedemptionExists(int id)
+        
+        [HttpDelete("{id}")]
+        public async Task<IActionResult> Delete(int id)
         {
-            return _context.Redemptions.Any(e => e.Id == id);
+            var data = await _context.Redemptions.FindAsync(id);
+
+            if (data == null || data.IsDeleted)
+                return NotFound();
+
+            data.IsDeleted = true;
+            data.DeletedAt = DateTime.Now;
+            data.DeletedBy = "admin";
+
+            await _context.SaveChangesAsync();
+
+            return NoContent();
+        }
+
+        private bool Exists(int id)
+        {
+            return _context.Redemptions.Any(e => e.Id == id && !e.IsDeleted);
         }
     }
 }

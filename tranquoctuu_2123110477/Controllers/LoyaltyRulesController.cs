@@ -2,7 +2,6 @@
 using Microsoft.EntityFrameworkCore;
 using tranquoctuu_2123110477.Models;
 using tranquoctuu_2123110477.Data;
-using ConnectDB.Models;
 
 namespace tranquoctuu_2123110477.Controllers
 {
@@ -17,66 +16,81 @@ namespace tranquoctuu_2123110477.Controllers
             _context = context;
         }
 
+      
         [HttpGet]
         public async Task<ActionResult<IEnumerable<LoyaltyRule>>> GetLoyaltyRules()
         {
-            return await _context.LoyaltyRules.ToListAsync();
+            return await _context.LoyaltyRules
+                .Where(x => !x.IsDeleted)
+                .ToListAsync();
         }
 
-      
+
         [HttpGet("{id}")]
         public async Task<ActionResult<LoyaltyRule>> GetLoyaltyRule(int id)
         {
-            var loyaltyRule = await _context.LoyaltyRules.FindAsync(id);
+            var data = await _context.LoyaltyRules
+                .FirstOrDefaultAsync(x => x.Id == id && !x.IsDeleted);
 
-            if (loyaltyRule == null)
-            {
-                return NotFound($"Không tìm thấy quy tắc với Id = {id}");
-            }
+            if (data == null)
+                return NotFound($"Không tìm thấy rule Id = {id}");
 
-            return loyaltyRule;
+            return data;
         }
 
         [HttpPost]
-        public async Task<ActionResult<LoyaltyRule>> PostLoyaltyRule(LoyaltyRule loyaltyRule)
+        public async Task<ActionResult<LoyaltyRule>> PostLoyaltyRule(LoyaltyRule model)
         {
-            _context.LoyaltyRules.Add(loyaltyRule);
+            model.CreatedAt = DateTime.Now;
+            model.CreatedBy = "admin";
+
+            model.UpdatedAt = DateTime.Now;
+            model.UpdatedBy = "admin";
+
+            _context.LoyaltyRules.Add(model);
             await _context.SaveChangesAsync();
 
-            return CreatedAtAction(nameof(GetLoyaltyRule), new { id = loyaltyRule.Id }, loyaltyRule);
+            return CreatedAtAction(nameof(GetLoyaltyRule), new { id = model.Id }, model);
         }
 
+        
         [HttpPut("{id}")]
-        public async Task<IActionResult> PutLoyaltyRule(int id, LoyaltyRule loyaltyRule)
+        public async Task<IActionResult> PutLoyaltyRule(int id, LoyaltyRule model)
         {
-            if (id != loyaltyRule.Id)
-            {
-                return BadRequest("Id không khớp.");
-            }
+            if (id != model.Id)
+                return BadRequest("Id không khớp");
 
-            _context.Entry(loyaltyRule).State = EntityState.Modified;
+            var existing = await _context.LoyaltyRules.FindAsync(id);
+            if (existing == null || existing.IsDeleted)
+                return NotFound();
 
-            try
-            {
-                await _context.SaveChangesAsync();
-            }
-            catch (DbUpdateConcurrencyException)
-            {
-                if (!LoyaltyRuleExists(id)) return NotFound();
-                else throw;
-            }
+          
+            existing.RuleName = model.RuleName;
+            existing.Description = model.Description;
+            existing.Points = model.Points;
+            existing.ActionType = model.ActionType;
+
+           
+            existing.UpdatedAt = DateTime.Now;
+            existing.UpdatedBy = "admin";
+
+            await _context.SaveChangesAsync();
 
             return NoContent();
         }
 
-      
+       
         [HttpDelete("{id}")]
         public async Task<IActionResult> DeleteLoyaltyRule(int id)
         {
-            var loyaltyRule = await _context.LoyaltyRules.FindAsync(id);
-            if (loyaltyRule == null) return NotFound();
+            var data = await _context.LoyaltyRules.FindAsync(id);
+            if (data == null || data.IsDeleted)
+                return NotFound();
 
-            _context.LoyaltyRules.Remove(loyaltyRule);
+            data.IsDeleted = true;
+            data.DeletedAt = DateTime.Now;
+            data.DeletedBy = "admin";
+
             await _context.SaveChangesAsync();
 
             return NoContent();
@@ -84,7 +98,7 @@ namespace tranquoctuu_2123110477.Controllers
 
         private bool LoyaltyRuleExists(int id)
         {
-            return _context.LoyaltyRules.Any(e => e.Id == id);
+            return _context.LoyaltyRules.Any(e => e.Id == id && !e.IsDeleted);
         }
     }
 }

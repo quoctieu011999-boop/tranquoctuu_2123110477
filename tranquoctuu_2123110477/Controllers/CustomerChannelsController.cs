@@ -20,69 +20,69 @@ namespace tranquoctuu_2123110477.Controllers
         [HttpGet]
         public async Task<ActionResult<IEnumerable<CustomerChannel>>> GetCustomerChannels()
         {
-            
             return await _context.CustomerChannels
-                                 .Include(cc => cc.Customer)
+                                 .Include(x => x.Customer)
                                  .ToListAsync();
         }
 
+       
         [HttpGet("{id}")]
         public async Task<ActionResult<CustomerChannel>> GetCustomerChannel(int id)
         {
-            var customerChannel = await _context.CustomerChannels
-                                                .Include(cc => cc.Customer)
-                                                .FirstOrDefaultAsync(cc => cc.Id == id);
+            var data = await _context.CustomerChannels
+                                     .Include(x => x.Customer)
+                                     .FirstOrDefaultAsync(x => x.Id == id);
 
-            if (customerChannel == null)
-            {
-                return NotFound($"Không tìm thấy kênh với Id = {id}");
-            }
+            if (data == null)
+                return NotFound($"Không tìm thấy Id = {id}");
 
-            return customerChannel;
-        }
-
-       
-        [HttpPost]
-        public async Task<ActionResult<CustomerChannel>> PostCustomerChannel(CustomerChannel customerChannel)
-        {
-            _context.CustomerChannels.Add(customerChannel);
-            await _context.SaveChangesAsync();
-
-            return CreatedAtAction(nameof(GetCustomerChannel), new { id = customerChannel.Id }, customerChannel);
+            return data;
         }
 
         
-        [HttpPut("{id}")]
-        public async Task<IActionResult> PutCustomerChannel(int id, CustomerChannel customerChannel)
+        [HttpPost]
+        public async Task<ActionResult<CustomerChannel>> PostCustomerChannel(CustomerChannel model)
         {
-            if (id != customerChannel.Id)
-            {
-                return BadRequest("Id không trùng khớp.");
-            }
+            if (model == null)
+                return BadRequest("Dữ liệu không hợp lệ");
 
-            _context.Entry(customerChannel).State = EntityState.Modified;
+            _context.CustomerChannels.Add(model);
+            await _context.SaveChangesAsync();
 
-            try
-            {
-                await _context.SaveChangesAsync();
-            }
-            catch (DbUpdateConcurrencyException)
-            {
-                if (!CustomerChannelExists(id)) return NotFound();
-                else throw;
-            }
+            return CreatedAtAction(nameof(GetCustomerChannel), new { id = model.Id }, model);
+        }
+
+       
+        [HttpPut("{id}")]
+        public async Task<IActionResult> PutCustomerChannel(int id, CustomerChannel model)
+        {
+            if (id != model.Id)
+                return BadRequest("Id không khớp");
+
+            var existing = await _context.CustomerChannels.FindAsync(id);
+            if (existing == null)
+                return NotFound();
+
+
+            existing.ChannelType = model.ChannelType;
+            existing.CustomerId = model.CustomerId;
+           
+
+            await _context.SaveChangesAsync();
 
             return NoContent();
         }
 
-    
+        
         [HttpDelete("{id}")]
         public async Task<IActionResult> DeleteCustomerChannel(int id)
         {
-            var customerChannel = await _context.CustomerChannels.FindAsync(id);
-            if (customerChannel == null) return NotFound();
+            var data = await _context.CustomerChannels.FindAsync(id);
 
-            _context.CustomerChannels.Remove(customerChannel);
+            if (data == null)
+                return NotFound();
+
+            _context.CustomerChannels.Remove(data);
             await _context.SaveChangesAsync();
 
             return NoContent();

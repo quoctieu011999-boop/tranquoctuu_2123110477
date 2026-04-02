@@ -16,75 +16,101 @@ namespace tranquoctuu_2123110477.Controllers
             _context = context;
         }
 
-        
+        // ================= GET ALL =================
         [HttpGet]
-        public async Task<ActionResult<IEnumerable<OrderItem>>> GetOrderItems()
+        public async Task<ActionResult<IEnumerable<object>>> GetOrderItems()
         {
-            return await _context.OrderItems
-                                 .Include(oi => oi.Order)
-                                 .ToListAsync();
+            var data = await _context.OrderItems
+                .Include(x => x.Product)
+                .Include(x => x.Order)
+                .Select(x => new
+                {
+                    x.Id,
+                    x.OrderId,
+                    ProductName = x.Product.Name,
+                    x.Quantity,
+                    x.Price
+                })
+                .ToListAsync();
+
+            return Ok(data);
         }
 
-       
+        // ================= GET BY ORDER =================
         [HttpGet("order/{orderId}")]
-        public async Task<ActionResult<IEnumerable<OrderItem>>> GetOrderItemsByOrder(int orderId)
+        public async Task<ActionResult<IEnumerable<object>>> GetByOrder(int orderId)
         {
             var items = await _context.OrderItems
-                                      .Where(oi => oi.OrderId == orderId)
-                                      .ToListAsync();
+                .Where(x => x.OrderId == orderId)
+                .Include(x => x.Product)
+                .Select(x => new
+                {
+                    x.Id,
+                    ProductName = x.Product.Name,
+                    x.Quantity,
+                    x.Price
+                })
+                .ToListAsync();
 
-            if (items == null || !items.Any()) return NotFound("Không tìm thấy món hàng nào cho đơn hàng này.");
+            if (!items.Any())
+                return NotFound("Không có sản phẩm trong đơn");
 
-            return items;
+            return Ok(items);
         }
 
-        
+        // ================= CREATE =================
         [HttpPost]
-        public async Task<ActionResult<OrderItem>> PostOrderItem(OrderItem orderItem)
+        public async Task<ActionResult<OrderItem>> Create(OrderItem model)
         {
-            _context.OrderItems.Add(orderItem);
+            // kiểm tra product tồn tại
+            var product = await _context.Products.FindAsync(model.ProductId);
+            if (product == null)
+                return BadRequest("Product không tồn tại");
+
+            _context.OrderItems.Add(model);
             await _context.SaveChangesAsync();
 
-            return CreatedAtAction(nameof(GetOrderItems), new { id = orderItem.Id }, orderItem);
+            return CreatedAtAction(nameof(GetOrderItems), new { id = model.Id }, model);
         }
 
-  
+        // ================= UPDATE =================
         [HttpPut("{id}")]
-        public async Task<IActionResult> PutOrderItem(int id, OrderItem orderItem)
+        public async Task<IActionResult> Update(int id, OrderItem model)
         {
-            if (id != orderItem.Id) return BadRequest();
+            if (id != model.Id)
+                return BadRequest("Id không khớp");
 
-            _context.Entry(orderItem).State = EntityState.Modified;
+            var existing = await _context.OrderItems.FindAsync(id);
+            if (existing == null)
+                return NotFound();
 
-            try
-            {
-                await _context.SaveChangesAsync();
-            }
-            catch (DbUpdateConcurrencyException)
-            {
-                if (!OrderItemExists(id)) return NotFound();
-                else throw;
-            }
+            existing.ProductId = model.ProductId; 
+            existing.Quantity = model.Quantity;
+            existing.Price = model.Price;
+            existing.OrderId = model.OrderId;
 
-            return NoContent();
-        }
-
-      
-        [HttpDelete("{id}")]
-        public async Task<IActionResult> DeleteOrderItem(int id)
-        {
-            var orderItem = await _context.OrderItems.FindAsync(id);
-            if (orderItem == null) return NotFound();
-
-            _context.OrderItems.Remove(orderItem);
             await _context.SaveChangesAsync();
 
             return NoContent();
         }
 
-        private bool OrderItemExists(int id)
+        // ================= DELETE =================
+        [HttpDelete("{id}")]
+        public async Task<IActionResult> Delete(int id)
         {
-            return _context.OrderItems.Any(e => e.Id == id);
+            var data = await _context.OrderItems.FindAsync(id);
+
+            if (data == null || data.IsDeleted) 
+                return NotFound("Sản phẩm không tồn tại hoặc đã bị xóa");
+
+            
+            data.IsDeleted = true;
+            data.DeletedAt = DateTime.Now;
+
+            _context.Entry(data).State = EntityState.Modified;
+            await _context.SaveChangesAsync();
+
+            return NoContent();
         }
     }
 }
