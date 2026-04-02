@@ -16,58 +16,92 @@ namespace tranquoctuu_2123110477.Controllers
             _context = context;
         }
 
-      
-        [HttpGet]
-        public async Task<ActionResult<IEnumerable<Redemption>>> GetRedemptions()
+        // GỘP 2 GET THÀNH 1
+        // GET: api/Redemptions
+        // GET: api/Redemptions/5
+        [HttpGet("{id?}")]
+        public async Task<ActionResult<object>> GetRedemptions(int? id)
         {
-            return await _context.Redemptions
-                                 .Include(r => r.Customer)
-                                 .Include(r => r.Reward)
-                                 .ToListAsync();
-        }
+            if (_context.Redemptions == null)
+                return NotFound();
 
-        [HttpGet("{id}")]
-        public async Task<ActionResult<Redemption>> GetRedemption(int id)
-        {
-            var redemption = await _context.Redemptions
-                                           .Include(r => r.Customer)
-                                           .Include(r => r.Reward)
-                                           .FirstOrDefaultAsync(r => r.Id == id);
+            // Thiết lập query chung bao gồm thông tin Khách hàng và Phần thưởng
+            var query = _context.Redemptions
+                .Where(x => !x.IsDeleted)
+                .Include(x => x.Customer)
+                .Include(x => x.Reward);
 
-            if (redemption == null)
+            // Trường hợp 1: Lấy chi tiết lịch sử đổi quà theo ID
+            if (id.HasValue)
             {
-                return NotFound($"Không tìm thấy giao dịch đổi quà với Id = {id}");
+                var data = await query.FirstOrDefaultAsync(x => x.Id == id.Value);
+
+                if (data == null)
+                    return NotFound($"Không tìm thấy bản ghi đổi quà Id = {id.Value}");
+
+                return Ok(data);
             }
 
-            return redemption;
+            // Trường hợp 2: Lấy toàn bộ danh sách đổi quà mới nhất lên đầu
+            var list = await query.OrderByDescending(x => x.CreatedAt).ToListAsync();
+
+            return Ok(list);
         }
 
-      
+        // POST: api/Redemptions
         [HttpPost]
-        public async Task<ActionResult<Redemption>> PostRedemption(Redemption redemption)
+        public async Task<ActionResult<Redemption>> Create(Redemption model)
         {
-            
-            var customerExists = await _context.Customers.AnyAsync(c => c.Id == redemption.CustomerId);
-            var rewardExists = await _context.Rewards.AnyAsync(rw => rw.Id == redemption.RewardId);
+            if (model == null) return BadRequest("Dữ liệu không hợp lệ");
 
-            if (!customerExists || !rewardExists)
-            {
-                return BadRequest("CustomerId hoặc RewardId không hợp lệ.");
-            }
+            // Kiểm tra sự tồn tại của Customer và Reward
+            var customer = await _context.Customers
+                .FirstOrDefaultAsync(c => c.Id == model.CustomerId && !c.IsDeleted);
 
-            _context.Redemptions.Add(redemption);
+            var reward = await _context.Rewards
+                .FirstOrDefaultAsync(r => r.Id == model.RewardId && !r.IsDeleted);
+
+            if (customer == null || reward == null)
+                return BadRequest("Khách hàng hoặc Phần thưởng không tồn tại");
+
+            // LOGIC NGHIỆP VỤ: Kiểm tra quỹ điểm của khách hàng
+            if (customer.Points < reward.PointCost)
+                return BadRequest("Số dư điểm không đủ để thực hiện đổi phần thưởng này");
+
+            // Thiết lập thông tin giao dịch đổi quà
+            model.PointsUsed = reward.PointCost;
+            model.Status = "Completed";
+            model.CreatedAt = DateTime.Now;
+            model.CreatedBy = "admin";
+            model.IsDeleted = false;
+
+            // Khấu trừ điểm trực tiếp của khách hàng
+            customer.Points -= reward.PointCost;
+            customer.UpdatedAt = DateTime.Now;
+
+            _context.Redemptions.Add(model);
             await _context.SaveChangesAsync();
 
-            return CreatedAtAction(nameof(GetRedemption), new { id = redemption.Id }, redemption);
+            // Trỏ về GetRedemptions (hàm đã gộp)
+            return CreatedAtAction(nameof(GetRedemptions), new { id = model.Id }, model);
         }
 
-    
+        // PUT: api/Redemptions/5
         [HttpPut("{id}")]
-        public async Task<IActionResult> PutRedemption(int id, Redemption redemption)
+        public async Task<IActionResult> Update(int id, Redemption model)
         {
-            if (id != redemption.Id) return BadRequest();
+            if (id != model.Id)
+                return BadRequest("Id không khớp");
 
-            _context.Entry(redemption).State = EntityState.Modified;
+            var existing = await _context.Redemptions.FindAsync(id);
+
+            if (existing == null || existing.IsDeleted)
+                return NotFound();
+
+            // Thường chỉ cập nhật trạng thái (ví dụ: Chờ xử lý -> Đã giao quà)
+            existing.Status = model.Status;
+            existing.UpdatedAt = DateTime.Now;
+            existing.UpdatedBy = "admin";
 
             try
             {
@@ -75,29 +109,35 @@ namespace tranquoctuu_2123110477.Controllers
             }
             catch (DbUpdateConcurrencyException)
             {
-                if (!RedemptionExists(id)) return NotFound();
+                if (!Exists(id)) return NotFound();
                 else throw;
             }
 
             return NoContent();
         }
 
-     
+        // DELETE: api/Redemptions/5 (Xóa mềm)
         [HttpDelete("{id}")]
-        public async Task<IActionResult> DeleteRedemption(int id)
+        public async Task<IActionResult> Delete(int id)
         {
-            var redemption = await _context.Redemptions.FindAsync(id);
-            if (redemption == null) return NotFound();
+            var data = await _context.Redemptions.FindAsync(id);
 
-            _context.Redemptions.Remove(redemption);
+            if (data == null || data.IsDeleted)
+                return NotFound();
+
+            // Thực hiện xóa mềm
+            data.IsDeleted = true;
+            data.DeletedAt = DateTime.Now;
+            data.DeletedBy = "admin";
+
             await _context.SaveChangesAsync();
 
             return NoContent();
         }
 
-        private bool RedemptionExists(int id)
+        private bool Exists(int id)
         {
-            return _context.Redemptions.Any(e => e.Id == id);
+            return _context.Redemptions.Any(e => e.Id == id && !e.IsDeleted);
         }
     }
 }

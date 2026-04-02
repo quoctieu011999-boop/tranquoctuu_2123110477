@@ -16,57 +16,74 @@ namespace tranquoctuu_2123110477.Controllers
             _context = context;
         }
 
-      
-        [HttpGet]
-        public async Task<ActionResult<IEnumerable<LoyaltyAccount>>> GetLoyaltyAccounts()
+        // GỘP 2 GET THÀNH 1
+        // GET: api/LoyaltyAccounts
+        // GET: api/LoyaltyAccounts/5
+        [HttpGet("{id?}")]
+        public async Task<ActionResult<object>> GetLoyaltyAccounts(int? id)
         {
-            
-            return await _context.LoyaltyAccounts
-                                 .Include(la => la.Customer)
-                                 .ToListAsync();
-        }
+            if (_context.LoyaltyAccounts == null)
+                return NotFound();
 
-       
-        [HttpGet("{id}")]
-        public async Task<ActionResult<LoyaltyAccount>> GetLoyaltyAccount(int id)
-        {
-            var loyaltyAccount = await _context.LoyaltyAccounts
-                                               .Include(la => la.Customer)
-                                               .FirstOrDefaultAsync(la => la.Id == id);
+            // Thiết lập truy vấn cơ bản kèm dữ liệu Customer
+            var query = _context.LoyaltyAccounts
+                .Where(x => !x.IsDeleted)
+                .Include(x => x.Customer);
 
-            if (loyaltyAccount == null)
+            // Trường hợp 1: Lấy chi tiết theo ID
+            if (id.HasValue)
             {
-                return NotFound($"Không tìm thấy tài khoản loyalty với Id = {id}");
+                var data = await query.FirstOrDefaultAsync(x => x.Id == id.Value);
+
+                if (data == null)
+                    return NotFound("Không tìm thấy tài khoản loyalty");
+
+                return Ok(data);
             }
 
-            return loyaltyAccount;
+            // Trường hợp 2: Lấy toàn bộ danh sách chưa xóa
+            var list = await query.ToListAsync();
+
+            return Ok(list);
         }
 
-        
+        // POST: api/LoyaltyAccounts
         [HttpPost]
-        public async Task<ActionResult<LoyaltyAccount>> PostLoyaltyAccount(LoyaltyAccount loyaltyAccount)
+        public async Task<ActionResult<LoyaltyAccount>> PostLoyaltyAccount(LoyaltyAccount model)
         {
-            
-            loyaltyAccount.UpdatedAt = DateTime.Now;
+            if (model == null) return BadRequest();
 
-            _context.LoyaltyAccounts.Add(loyaltyAccount);
+            model.CreatedAt = DateTime.Now;
+            model.CreatedBy = "admin";
+            model.UpdatedAt = DateTime.Now;
+            model.UpdatedBy = "admin";
+            model.IsDeleted = false;
+
+            _context.LoyaltyAccounts.Add(model);
             await _context.SaveChangesAsync();
 
-            return CreatedAtAction(nameof(GetLoyaltyAccount), new { id = loyaltyAccount.Id }, loyaltyAccount);
+            // Trỏ về hàm GetLoyaltyAccounts (đã gộp)
+            return CreatedAtAction(nameof(GetLoyaltyAccounts), new { id = model.Id }, model);
         }
 
-        
+        // PUT: api/LoyaltyAccounts/5
         [HttpPut("{id}")]
-        public async Task<IActionResult> PutLoyaltyAccount(int id, LoyaltyAccount loyaltyAccount)
+        public async Task<IActionResult> PutLoyaltyAccount(int id, LoyaltyAccount model)
         {
-            if (id != loyaltyAccount.Id)
-            {
-                return BadRequest("Id không trùng khớp.");
-            }
+            if (id != model.Id)
+                return BadRequest("Id không trùng");
 
-            
-            loyaltyAccount.UpdatedAt = DateTime.Now;
-            _context.Entry(loyaltyAccount).State = EntityState.Modified;
+            var existing = await _context.LoyaltyAccounts.FindAsync(id);
+            if (existing == null || existing.IsDeleted)
+                return NotFound();
+
+            // Cập nhật thông tin từ model truyền vào
+            existing.CustomerId = model.CustomerId;
+            existing.Points = model.Points;
+            existing.Level = model.Level;
+
+            existing.UpdatedAt = DateTime.Now;
+            existing.UpdatedBy = "admin";
 
             try
             {
@@ -81,14 +98,19 @@ namespace tranquoctuu_2123110477.Controllers
             return NoContent();
         }
 
-       
+        // DELETE: api/LoyaltyAccounts/5 (Soft Delete)
         [HttpDelete("{id}")]
         public async Task<IActionResult> DeleteLoyaltyAccount(int id)
         {
-            var loyaltyAccount = await _context.LoyaltyAccounts.FindAsync(id);
-            if (loyaltyAccount == null) return NotFound();
+            var data = await _context.LoyaltyAccounts.FindAsync(id);
+            if (data == null || data.IsDeleted)
+                return NotFound();
 
-            _context.LoyaltyAccounts.Remove(loyaltyAccount);
+            // Thực hiện xóa mềm
+            data.IsDeleted = true;
+            data.DeletedAt = DateTime.Now;
+            data.DeletedBy = "admin";
+
             await _context.SaveChangesAsync();
 
             return NoContent();
@@ -96,7 +118,7 @@ namespace tranquoctuu_2123110477.Controllers
 
         private bool LoyaltyAccountExists(int id)
         {
-            return _context.LoyaltyAccounts.Any(e => e.Id == id);
+            return _context.LoyaltyAccounts.Any(e => e.Id == id && !e.IsDeleted);
         }
     }
 }

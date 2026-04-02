@@ -1,17 +1,31 @@
-﻿
-using System.ComponentModel.DataAnnotations;
-namespace tranquoctuu_2123110477.Models;
+﻿using System.ComponentModel.DataAnnotations;
+using System.ComponentModel.DataAnnotations.Schema;
 
-public class Order
+namespace tranquoctuu_2123110477.Models
+{
+    public class Order : BaseEntity
     {
+        [Key]
         public int Id { get; set; }
+
+        [Required]
         public int CustomerId { get; set; }
-        public decimal TotalAmount { get; set; }
-        public string Channel { get; set; }
-        public string Status { get; set; }
-        public DateTime CreatedAt { get; set; } = DateTime.Now;
 
-        public Customer Customer { get; set; }
-        public ICollection<OrderItem> OrderItems { get; set; }
+        [Column(TypeName = "decimal(18,2)")]
+        public decimal TotalAmount { get; set; } = 0;
+
+        [Required]
+        [StringLength(50)]
+        public string Channel { get; set; } 
+
+        [Required]
+        [StringLength(50)]
+        public string Status { get; set; } 
+
+        // Quan hệ Navigation
+        [ForeignKey("CustomerId")]
+        public virtual Customer? Customer { get; set; }
+
+        public virtual List<OrderItem>? OrderItems { get; set; }
     }
-
+}

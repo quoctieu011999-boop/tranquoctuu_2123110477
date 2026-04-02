@@ -16,52 +16,120 @@ namespace tranquoctuu_2123110477.Controllers
             _context = context;
         }
 
-        
-        [HttpGet]
-        public async Task<ActionResult<IEnumerable<Order>>> GetOrders()
+        // GỘP 2 GET THÀNH 1
+        // GET: api/Orders
+        // GET: api/Orders/5
+        [HttpGet("{id?}")]
+        public async Task<ActionResult<object>> GetOrders(int? id)
         {
-            return await _context.Orders
-                                 .Include(o => o.Customer)
-                                 .Include(o => o.OrderItems)
-                                 .OrderByDescending(o => o.CreatedAt)
-                                 .ToListAsync();
-        }
+            if (_context.Orders == null)
+                return NotFound();
 
-        
-        [HttpGet("{id}")]
-        public async Task<ActionResult<Order>> GetOrder(int id)
-        {
-            var order = await _context.Orders
-                                      .Include(o => o.Customer)
-                                      .Include(o => o.OrderItems)
-                                      .FirstOrDefaultAsync(o => o.Id == id);
+            // Thiết lập query cơ bản với các liên kết bảng liên quan
+            var query = _context.Orders
+                .Where(x => !x.IsDeleted)
+                .Include(x => x.Customer)
+                .Include(x => x.OrderItems.Where(i => !i.IsDeleted))
+                    .ThenInclude(i => i.Product); // Load thêm thông tin Product nếu cần
 
-            if (order == null)
+            // Trường hợp 1: Lấy chi tiết một đơn hàng theo ID
+            if (id.HasValue)
             {
-                return NotFound($"Không tìm thấy đơn hàng với Id = {id}");
+                var data = await query.FirstOrDefaultAsync(x => x.Id == id.Value);
+
+                if (data == null)
+                    return NotFound($"Không tìm thấy đơn hàng với Id = {id.Value}");
+
+                return Ok(data);
             }
 
-            return order;
+            // Trường hợp 2: Lấy toàn bộ danh sách đơn hàng mới nhất lên đầu
+            var list = await query.OrderByDescending(x => x.CreatedAt).ToListAsync();
+
+            return Ok(list);
         }
 
-      
+        // POST: api/Orders
         [HttpPost]
-        public async Task<ActionResult<Order>> PostOrder(Order order)
+        public async Task<ActionResult<Order>> Create(Order model)
         {
-            order.CreatedAt = DateTime.Now;
-            _context.Orders.Add(order);
+            if (model == null) return BadRequest("Dữ liệu không hợp lệ");
+
+            model.CreatedAt = DateTime.Now;
+            model.CreatedBy = "admin";
+            model.Status = "Pending";
+            model.IsDeleted = false;
+
+            // Tính toán tổng tiền từ danh sách Item đính kèm
+            if (model.OrderItems != null && model.OrderItems.Any())
+            {
+                model.TotalAmount = model.OrderItems
+                    .Sum(i => i.Price * i.Quantity);
+
+                foreach (var item in model.OrderItems)
+                {
+                    item.CreatedAt = DateTime.Now;
+                    item.CreatedBy = "admin";
+                    item.IsDeleted = false;
+                }
+            }
+            else
+            {
+                model.TotalAmount = 0;
+            }
+
+            _context.Orders.Add(model);
             await _context.SaveChangesAsync();
 
-            return CreatedAtAction(nameof(GetOrder), new { id = order.Id }, order);
+            // Trỏ về GetOrders (hàm đã gộp)
+            return CreatedAtAction(nameof(GetOrders), new { id = model.Id }, model);
         }
 
-        
+        // PUT: api/Orders/5
         [HttpPut("{id}")]
-        public async Task<IActionResult> PutOrder(int id, Order order)
+        public async Task<IActionResult> Update(int id, Order model)
         {
-            if (id != order.Id) return BadRequest();
+            if (id != model.Id)
+                return BadRequest("Id không khớp");
 
-            _context.Entry(order).State = EntityState.Modified;
+            var existing = await _context.Orders
+                .Include(x => x.OrderItems)
+                .FirstOrDefaultAsync(x => x.Id == id);
+
+            if (existing == null || existing.IsDeleted)
+                return NotFound();
+
+            // Cập nhật thông tin cơ bản
+            existing.CustomerId = model.CustomerId;
+            existing.Status = model.Status;
+            existing.UpdatedAt = DateTime.Now;
+            existing.UpdatedBy = "admin";
+
+            // Xử lý cập nhật danh sách sản phẩm trong đơn (nếu có truyền lên)
+            if (model.OrderItems != null)
+            {
+                // Đánh dấu xóa toàn bộ Item cũ
+                foreach (var old in existing.OrderItems)
+                {
+                    old.IsDeleted = true;
+                    old.DeletedAt = DateTime.Now;
+                    old.DeletedBy = "admin";
+                }
+
+                // Gán danh sách mới
+                existing.OrderItems = model.OrderItems;
+
+                foreach (var item in existing.OrderItems)
+                {
+                    item.CreatedAt = DateTime.Now;
+                    item.CreatedBy = "admin";
+                }
+
+                // Tính lại tổng tiền sau khi cập nhật Item
+                existing.TotalAmount = existing.OrderItems
+                    .Where(i => !i.IsDeleted)
+                    .Sum(i => i.Price * i.Quantity);
+            }
 
             try
             {
@@ -69,30 +137,45 @@ namespace tranquoctuu_2123110477.Controllers
             }
             catch (DbUpdateConcurrencyException)
             {
-                if (!OrderExists(id)) return NotFound();
+                if (!Exists(id)) return NotFound();
                 else throw;
             }
 
             return NoContent();
         }
 
-        // DELETE: api/Orders/5
+        // DELETE: api/Orders/5 (Xóa mềm cả Đơn hàng và Chi tiết đơn hàng)
         [HttpDelete("{id}")]
-        public async Task<IActionResult> DeleteOrder(int id)
+        public async Task<IActionResult> Delete(int id)
         {
-            var order = await _context.Orders.FindAsync(id);
-            if (order == null) return NotFound();
+            var data = await _context.Orders
+                .Include(x => x.OrderItems)
+                .FirstOrDefaultAsync(x => x.Id == id);
 
-            
-            _context.Orders.Remove(order);
+            if (data == null || data.IsDeleted)
+                return NotFound();
+
+            // Xóa mềm Đơn hàng
+            data.IsDeleted = true;
+            data.DeletedAt = DateTime.Now;
+            data.DeletedBy = "admin";
+
+            // Xóa mềm toàn bộ Item thuộc đơn hàng đó
+            foreach (var item in data.OrderItems)
+            {
+                item.IsDeleted = true;
+                item.DeletedAt = DateTime.Now;
+                item.DeletedBy = "admin";
+            }
+
             await _context.SaveChangesAsync();
 
             return NoContent();
         }
 
-        private bool OrderExists(int id)
+        private bool Exists(int id)
         {
-            return _context.Orders.Any(e => e.Id == id);
+            return _context.Orders.Any(e => e.Id == id && !e.IsDeleted);
         }
     }
 }

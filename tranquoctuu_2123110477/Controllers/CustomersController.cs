@@ -1,8 +1,7 @@
 ﻿using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
-using tranquoctuu_2123110477.Models; 
+using tranquoctuu_2123110477.Models;
 using tranquoctuu_2123110477.Data;
-
 
 namespace ConnectDB.Controllers
 {
@@ -12,115 +11,93 @@ namespace ConnectDB.Controllers
     {
         private readonly AppDbContext _context;
 
-      
         public CustomersController(AppDbContext context)
         {
             _context = context;
         }
 
-        
-        [HttpGet]
-        public async Task<ActionResult<IEnumerable<Customer>>> GetCustomers()
+    
+        [HttpGet("{id?}")]
+        public async Task<ActionResult<object>> GetCustomers(int? id)
         {
             if (_context.Customers == null)
+                return NotFound("Entity set 'Customers' is null.");
+
+            // Nếu có ID: Trả về 1 khách hàng cụ thể
+            if (id.HasValue)
             {
-                return NotFound("Entity set 'AppDbContext.Customers' is null.");
-            }
-            return await _context.Customers.ToListAsync();
-        }
+                var customer = await _context.Customers
+                    .FirstOrDefaultAsync(c => c.Id == id.Value && c.DeletedAt == null);
 
+                if (customer == null)
+                    return NotFound($"Không tìm thấy khách hàng với Id = {id.Value}");
 
-        [HttpGet("{id}")]
-        public async Task<ActionResult<Customer>> GetCustomer(int id)
-        {
-            if (_context.Customers == null)
-            {
-                return NotFound();
-            }
-
-          
-            var customer = await _context.Customers
-                                      
-                                         .FirstOrDefaultAsync(c => c.Id == id);
-
-            if (customer == null)
-            {
-                return NotFound($"Không tìm thấy khách hàng với Id = {id}");
+                return Ok(customer);
             }
 
-            return customer;
+            // Nếu không có ID: Trả về toàn bộ danh sách chưa xóa
+            var list = await _context.Customers
+                .Where(c => c.DeletedAt == null)
+                .ToListAsync();
+
+            return Ok(list);
         }
 
         [HttpPost]
         public async Task<ActionResult<Customer>> PostCustomer(Customer customer)
         {
-            if (_context.Customers == null)
-            {
-                return Problem("Entity set 'AppDbContext.Customers' is null.");
-            }
+            var username = User.Identity?.Name ?? "admin";
+
+            customer.CreatedBy = username;
+            customer.CreatedAt = DateTime.Now;
 
             _context.Customers.Add(customer);
             await _context.SaveChangesAsync();
 
-         
-            return CreatedAtAction(nameof(GetCustomer), new { id = customer.Id }, customer);
+            // Sửa lại nameof để trỏ đúng về hàm GetCustomers ở trên
+            return CreatedAtAction(nameof(GetCustomers), new { id = customer.Id }, customer);
         }
 
-       
         [HttpPut("{id}")]
         public async Task<IActionResult> PutCustomer(int id, Customer customer)
         {
             if (id != customer.Id)
-            {
-                return BadRequest("Id trên URL không khớp với Id của model.");
-            }
+                return BadRequest("Id không khớp");
 
-            _context.Entry(customer).State = EntityState.Modified;
-
-            try
-            {
-                await _context.SaveChangesAsync();
-            }
-            catch (DbUpdateConcurrencyException)
-            {
-                if (!CustomerExists(id))
-                {
-                    return NotFound($"Không tìm thấy khách hàng với Id = {id}");
-                }
-                else
-                {
-                    throw;
-                }
-            }
-
-            return NoContent(); 
-        }
-
-       
-        [HttpDelete("{id}")]
-        public async Task<IActionResult> DeleteCustomer(int id)
-        {
-            if (_context.Customers == null)
-            {
+            var existingCustomer = await _context.Customers.FindAsync(id);
+            if (existingCustomer == null)
                 return NotFound();
-            }
 
-            var customer = await _context.Customers.FindAsync(id);
-            if (customer == null)
-            {
-                return NotFound($"Không tìm thấy khách hàng với Id = {id}");
-            }
+            var username = User.Identity?.Name ?? "admin";
 
-            _context.Customers.Remove(customer);
+            existingCustomer.Name = customer.Name;
+            existingCustomer.Email = customer.Email;
+            existingCustomer.UpdatedBy = username;
+            existingCustomer.UpdatedAt = DateTime.Now;
+
             await _context.SaveChangesAsync();
 
             return NoContent();
         }
 
- 
-        private bool CustomerExists(int id)
+        [HttpDelete("{id}")]
+        public async Task<IActionResult> DeleteCustomer(int id)
         {
-            return (_context.Customers?.Any(e => e.Id == id)).GetValueOrDefault();
+            var customer = await _context.Customers.FindAsync(id);
+
+            if (customer == null || customer.DeletedAt != null)
+                return NotFound();
+
+            var username = User.Identity?.Name ?? "admin";
+
+            customer.IsDeleted = true;
+            customer.DeletedAt = DateTime.Now;
+            customer.DeletedBy = username;
+
+            _context.Entry(customer).State = EntityState.Modified;
+            await _context.SaveChangesAsync();
+
+            return NoContent();
         }
     }
 }

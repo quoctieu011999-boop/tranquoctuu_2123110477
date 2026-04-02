@@ -1,18 +1,31 @@
 ﻿using System.ComponentModel.DataAnnotations;
-namespace tranquoctuu_2123110477.Models;
+using System.ComponentModel.DataAnnotations.Schema;
 
-public class Notification
+namespace tranquoctuu_2123110477.Models
 {
-    public int Id { get; set; }
-    public int CustomerId { get; set; }
+    public class Notification : BaseEntity
+    {
+        [Key]
+        public int Id { get; set; }
 
-    public string Title { get; set; }
-    public string Message { get; set; }
-    public string Channel { get; set; }
-    public bool IsSent { get; set; } = false;
+        [Required]
+        public int CustomerId { get; set; }
 
-    public DateTime CreatedAt { get; set; } = DateTime.Now;
+        [Required]
+        [StringLength(100)]
+        public string Title { get; set; }
 
-    public Customer Customer { get; set; }
+        [Required]
+        public string Message { get; set; } 
+
+        [StringLength(50)]
+        public string Type { get; set; } 
+
+        public bool IsSent { get; set; } = false; 
+
+        public bool IsRead { get; set; } = false; 
+
+        [ForeignKey("CustomerId")]
+        public virtual Customer? Customer { get; set; }
+    }
 }
- 

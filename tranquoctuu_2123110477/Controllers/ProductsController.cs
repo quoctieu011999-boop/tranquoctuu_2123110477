@@ -7,80 +7,79 @@ namespace tranquoctuu_2123110477.Controllers
 {
     [Route("api/[controller]")]
     [ApiController]
-    public class LoyaltyRulesController : ControllerBase
+    public class ProductsController : ControllerBase
     {
         private readonly AppDbContext _context;
 
-        public LoyaltyRulesController(AppDbContext context)
+        public ProductsController(AppDbContext context)
         {
             _context = context;
         }
 
         // GỘP 2 GET THÀNH 1
-        // GET: api/LoyaltyRules
-        // GET: api/LoyaltyRules/5
+        // GET: api/Products
+        // GET: api/Products/5
         [HttpGet("{id?}")]
-        public async Task<ActionResult<object>> GetLoyaltyRules(int? id)
+        public async Task<ActionResult<object>> GetProducts(int? id)
         {
-            if (_context.LoyaltyRules == null)
+            if (_context.Products == null)
                 return NotFound();
 
-            // Khởi tạo query cơ bản
-            var query = _context.LoyaltyRules.Where(x => !x.IsDeleted);
-
-            // Trường hợp 1: Lấy chi tiết rule theo ID
+            // Trường hợp 1: Lấy chi tiết sản phẩm theo ID
             if (id.HasValue)
             {
-                var data = await query.FirstOrDefaultAsync(x => x.Id == id.Value);
+                var data = await _context.Products
+                    .FirstOrDefaultAsync(x => x.Id == id.Value && !x.IsDeleted);
 
                 if (data == null)
-                    return NotFound($"Không tìm thấy rule Id = {id.Value}");
+                    return NotFound($"Không tìm thấy sản phẩm với Id = {id.Value}");
 
                 return Ok(data);
             }
 
-            // Trường hợp 2: Lấy toàn bộ danh sách rule chưa bị xóa
-            var list = await query.OrderByDescending(x => x.CreatedAt).ToListAsync();
+            // Trường hợp 2: Lấy toàn bộ danh sách sản phẩm chưa xóa, mới nhất lên đầu
+            var list = await _context.Products
+                .Where(x => !x.IsDeleted)
+                .OrderByDescending(x => x.CreatedAt)
+                .ToListAsync();
 
             return Ok(list);
         }
 
-        // POST: api/LoyaltyRules
+        // POST: api/Products
         [HttpPost]
-        public async Task<ActionResult<LoyaltyRule>> PostLoyaltyRule(LoyaltyRule model)
+        public async Task<ActionResult<Product>> Create(Product model)
         {
             if (model == null) return BadRequest("Dữ liệu không hợp lệ");
 
             model.CreatedAt = DateTime.Now;
             model.CreatedBy = "admin";
-            model.UpdatedAt = DateTime.Now;
-            model.UpdatedBy = "admin";
             model.IsDeleted = false;
 
-            _context.LoyaltyRules.Add(model);
+            _context.Products.Add(model);
             await _context.SaveChangesAsync();
 
-            // Trỏ về GetLoyaltyRules đã gộp
-            return CreatedAtAction(nameof(GetLoyaltyRules), new { id = model.Id }, model);
+            // Trỏ về GetProducts (hàm đã gộp)
+            return CreatedAtAction(nameof(GetProducts), new { id = model.Id }, model);
         }
 
-        // PUT: api/LoyaltyRules/5
+        // PUT: api/Products/5
         [HttpPut("{id}")]
-        public async Task<IActionResult> PutLoyaltyRule(int id, LoyaltyRule model)
+        public async Task<IActionResult> Update(int id, Product model)
         {
             if (id != model.Id)
                 return BadRequest("Id không khớp");
 
-            var existing = await _context.LoyaltyRules.FindAsync(id);
+            var existing = await _context.Products.FindAsync(id);
 
             if (existing == null || existing.IsDeleted)
                 return NotFound();
 
             // Cập nhật các trường thông tin
-            existing.RuleName = model.RuleName;
+            existing.Name = model.Name;
+            existing.Price = model.Price;
+            existing.Stock = model.Stock;
             existing.Description = model.Description;
-            existing.Points = model.Points;
-            existing.ActionType = model.ActionType;
 
             existing.UpdatedAt = DateTime.Now;
             existing.UpdatedBy = "admin";
@@ -91,18 +90,18 @@ namespace tranquoctuu_2123110477.Controllers
             }
             catch (DbUpdateConcurrencyException)
             {
-                if (!LoyaltyRuleExists(id)) return NotFound();
+                if (!Exists(id)) return NotFound();
                 else throw;
             }
 
             return NoContent();
         }
 
-        // DELETE: api/LoyaltyRules/5 (Xóa mềm)
+        // DELETE: api/Products/5 (Xóa mềm)
         [HttpDelete("{id}")]
-        public async Task<IActionResult> DeleteLoyaltyRule(int id)
+        public async Task<IActionResult> Delete(int id)
         {
-            var data = await _context.LoyaltyRules.FindAsync(id);
+            var data = await _context.Products.FindAsync(id);
 
             if (data == null || data.IsDeleted)
                 return NotFound();
@@ -117,9 +116,9 @@ namespace tranquoctuu_2123110477.Controllers
             return NoContent();
         }
 
-        private bool LoyaltyRuleExists(int id)
+        private bool Exists(int id)
         {
-            return _context.LoyaltyRules.Any(e => e.Id == id && !e.IsDeleted);
+            return _context.Products.Any(e => e.Id == id && !e.IsDeleted);
         }
     }
 }

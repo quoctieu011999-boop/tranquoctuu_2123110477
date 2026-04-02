@@ -1,15 +1,25 @@
 ﻿using System.ComponentModel.DataAnnotations;
-namespace tranquoctuu_2123110477.Models;
+using System.ComponentModel.DataAnnotations.Schema;
 
-    public class CustomerInteraction
+namespace tranquoctuu_2123110477.Models
+{
+    public class CustomerInteraction : BaseEntity
     {
+        [Key]
         public int Id { get; set; }
+
+        [Required]
         public int CustomerId { get; set; }
 
-        public string InteractionType { get; set; } // Call, Email, Chat
-        public string Content { get; set; }
-        public DateTime CreatedAt { get; set; } = DateTime.Now;
+        [Required]
+        [StringLength(50)]
+        public string InteractionType { get; set; } 
 
-        public Customer Customer { get; set; }
+        [Required]
+        public string Content { get; set; } 
+
+        // Khai báo khóa ngoại rõ ràng
+        [ForeignKey("CustomerId")]
+        public virtual Customer? Customer { get; set; }
     }
-
+}

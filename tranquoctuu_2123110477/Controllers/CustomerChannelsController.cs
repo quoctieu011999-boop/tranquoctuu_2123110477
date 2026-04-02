@@ -16,81 +16,58 @@ namespace tranquoctuu_2123110477.Controllers
             _context = context;
         }
 
-       
-        [HttpGet]
-        public async Task<ActionResult<IEnumerable<CustomerChannel>>> GetCustomerChannels()
+        // GỘP 2 GET THÀNH 1
+        [HttpGet("{id?}")]
+        public async Task<ActionResult<object>> GetCustomerChannels(int? id)
         {
-            
-            return await _context.CustomerChannels
-                                 .Include(cc => cc.Customer)
-                                 .ToListAsync();
-        }
+            if (_context.CustomerChannels == null) return NotFound();
 
-        [HttpGet("{id}")]
-        public async Task<ActionResult<CustomerChannel>> GetCustomerChannel(int id)
-        {
-            var customerChannel = await _context.CustomerChannels
-                                                .Include(cc => cc.Customer)
-                                                .FirstOrDefaultAsync(cc => cc.Id == id);
+            var query = _context.CustomerChannels.Where(x => !x.IsDeleted);
 
-            if (customerChannel == null)
+            if (id.HasValue)
             {
-                return NotFound($"Không tìm thấy kênh với Id = {id}");
+                var data = await query.FirstOrDefaultAsync(x => x.Id == id.Value);
+                if (data == null) return NotFound($"Không tìm thấy Channel Id = {id.Value}");
+                return Ok(data);
             }
 
-            return customerChannel;
+            return Ok(await query.ToListAsync());
         }
 
-       
         [HttpPost]
-        public async Task<ActionResult<CustomerChannel>> PostCustomerChannel(CustomerChannel customerChannel)
+        public async Task<ActionResult<CustomerChannel>> Create(CustomerChannel model)
         {
-            _context.CustomerChannels.Add(customerChannel);
+            model.CreatedAt = DateTime.Now;
+            model.IsDeleted = false;
+            _context.CustomerChannels.Add(model);
             await _context.SaveChangesAsync();
-
-            return CreatedAtAction(nameof(GetCustomerChannel), new { id = customerChannel.Id }, customerChannel);
+            return CreatedAtAction(nameof(GetCustomerChannels), new { id = model.Id }, model);
         }
 
-        
         [HttpPut("{id}")]
-        public async Task<IActionResult> PutCustomerChannel(int id, CustomerChannel customerChannel)
+        public async Task<IActionResult> Update(int id, CustomerChannel model)
         {
-            if (id != customerChannel.Id)
-            {
-                return BadRequest("Id không trùng khớp.");
-            }
+            if (id != model.Id) return BadRequest();
+            var existing = await _context.CustomerChannels.FindAsync(id);
+            if (existing == null || existing.IsDeleted) return NotFound();
 
-            _context.Entry(customerChannel).State = EntityState.Modified;
+            existing.ChannelType = model.ChannelType; 
+            existing.UpdatedAt = DateTime.Now;
 
-            try
-            {
-                await _context.SaveChangesAsync();
-            }
-            catch (DbUpdateConcurrencyException)
-            {
-                if (!CustomerChannelExists(id)) return NotFound();
-                else throw;
-            }
-
-            return NoContent();
-        }
-
-    
-        [HttpDelete("{id}")]
-        public async Task<IActionResult> DeleteCustomerChannel(int id)
-        {
-            var customerChannel = await _context.CustomerChannels.FindAsync(id);
-            if (customerChannel == null) return NotFound();
-
-            _context.CustomerChannels.Remove(customerChannel);
             await _context.SaveChangesAsync();
-
             return NoContent();
         }
 
-        private bool CustomerChannelExists(int id)
+        [HttpDelete("{id}")]
+        public async Task<IActionResult> Delete(int id)
         {
-            return _context.CustomerChannels.Any(e => e.Id == id);
+            var data = await _context.CustomerChannels.FindAsync(id);
+            if (data == null || data.IsDeleted) return NotFound();
+
+            data.IsDeleted = true;
+            data.DeletedAt = DateTime.Now;
+            await _context.SaveChangesAsync();
+            return NoContent();
         }
     }
 }
