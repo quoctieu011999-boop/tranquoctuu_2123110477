@@ -1,28 +1,12 @@
 ﻿using System.ComponentModel.DataAnnotations;
-using System.ComponentModel.DataAnnotations.Schema;
-
-namespace tranquoctuu_2123110477.Models
+namespace ConnectDB.Models;
+public class LoyaltyRule
 {
-    public class LoyaltyRule : BaseEntity
-    {
-        [Key]
-        public int Id { get; set; }
+    public int Id { get; set; }
 
-        [Required]
-        [StringLength(100)]
-        public string RuleName { get; set; } 
+    public string RuleName { get; set; }
+    public int PointsPerAmount { get; set; }
+    public int MinPointsToRedeem { get; set; }
 
-        public string? Description { get; set; }
-
-        [Required]
-        public int Points { get; set; } 
-
-        [Required]
-        [StringLength(50)]
-        public string ActionType { get; set; } 
-
-        public decimal? ConditionValue { get; set; } 
-
-        public bool IsActive { get; set; } = true; 
-    }
+    public DateTime CreatedAt { get; set; } = DateTime.Now;
 }

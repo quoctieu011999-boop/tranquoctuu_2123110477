@@ -16,101 +16,57 @@ namespace tranquoctuu_2123110477.Controllers
             _context = context;
         }
 
-        // GỘP 2 GET THÀNH 1
-        // GET: api/LoyaltyRules
-        // GET: api/LoyaltyRules/5
-        [HttpGet("{id?}")]
-        public async Task<ActionResult<object>> GetLoyaltyRules(int? id)
+        [HttpGet]
+        public async Task<ActionResult<IEnumerable<LoyaltyRule>>> GetLoyaltyRules()
         {
-            if (_context.LoyaltyRules == null)
-                return NotFound();
+            return await _context.LoyaltyRules.ToListAsync();
+        }
 
-            // Khởi tạo query cơ bản
-            var query = _context.LoyaltyRules.Where(x => !x.IsDeleted);
+      
+        [HttpGet("{id}")]
+        public async Task<ActionResult<LoyaltyRule>> GetLoyaltyRule(int id)
+        {
+            var loyaltyRule = await _context.LoyaltyRules.FindAsync(id);
 
-            // Trường hợp 1: Lấy chi tiết rule theo ID
-            if (id.HasValue)
+            if (loyaltyRule == null)
             {
-                var data = await query.FirstOrDefaultAsync(x => x.Id == id.Value);
-
-                if (data == null)
-                    return NotFound($"Không tìm thấy rule Id = {id.Value}");
-
-                return Ok(data);
+                return NotFound($"Không tìm thấy quy tắc với Id = {id}");
             }
 
-            // Trường hợp 2: Lấy toàn bộ danh sách rule chưa bị xóa
-            var list = await query.OrderByDescending(x => x.CreatedAt).ToListAsync();
-
-            return Ok(list);
+            return loyaltyRule;
         }
 
         // POST: api/LoyaltyRules
         [HttpPost]
         public async Task<ActionResult<LoyaltyRule>> PostLoyaltyRule(LoyaltyRule model)
         {
-            if (model == null) return BadRequest("Dữ liệu không hợp lệ");
-
-            model.CreatedAt = DateTime.Now;
-            model.CreatedBy = "admin";
-            model.UpdatedAt = DateTime.Now;
-            model.UpdatedBy = "admin";
-            model.IsDeleted = false;
-
-            _context.LoyaltyRules.Add(model);
+            _context.LoyaltyRules.Add(loyaltyRule);
             await _context.SaveChangesAsync();
 
-            // Trỏ về GetLoyaltyRules đã gộp
-            return CreatedAtAction(nameof(GetLoyaltyRules), new { id = model.Id }, model);
+            return CreatedAtAction(nameof(GetLoyaltyRule), new { id = loyaltyRule.Id }, loyaltyRule);
         }
 
-        // PUT: api/LoyaltyRules/5
         [HttpPut("{id}")]
-        public async Task<IActionResult> PutLoyaltyRule(int id, LoyaltyRule model)
+        public async Task<IActionResult> PutLoyaltyRule(int id, LoyaltyRule loyaltyRule)
         {
-            if (id != model.Id)
-                return BadRequest("Id không khớp");
-
-            var existing = await _context.LoyaltyRules.FindAsync(id);
-
-            if (existing == null || existing.IsDeleted)
-                return NotFound();
-
-            // Cập nhật các trường thông tin
-            existing.RuleName = model.RuleName;
-            existing.Description = model.Description;
-            existing.Points = model.Points;
-            existing.ActionType = model.ActionType;
-
-            existing.UpdatedAt = DateTime.Now;
-            existing.UpdatedBy = "admin";
-
-            try
+            if (id != loyaltyRule.Id)
             {
-                await _context.SaveChangesAsync();
+                return BadRequest("Id không khớp.");
             }
-            catch (DbUpdateConcurrencyException)
-            {
-                if (!LoyaltyRuleExists(id)) return NotFound();
-                else throw;
-            }
+
+            _context.Entry(loyaltyRule).State = EntityState.Modified;
+
+            await _context.SaveChangesAsync();
 
             return NoContent();
         }
 
-        // DELETE: api/LoyaltyRules/5 (Xóa mềm)
+      
         [HttpDelete("{id}")]
         public async Task<IActionResult> DeleteLoyaltyRule(int id)
         {
-            var data = await _context.LoyaltyRules.FindAsync(id);
-
-            if (data == null || data.IsDeleted)
-                return NotFound();
-
-            // Thực hiện xóa mềm
-            data.IsDeleted = true;
-            data.DeletedAt = DateTime.Now;
-            data.DeletedBy = "admin";
+            var loyaltyRule = await _context.LoyaltyRules.FindAsync(id);
+            if (loyaltyRule == null) return NotFound();
 
             await _context.SaveChangesAsync();
 

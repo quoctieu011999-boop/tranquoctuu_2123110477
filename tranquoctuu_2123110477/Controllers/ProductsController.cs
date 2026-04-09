@@ -16,26 +16,14 @@ namespace tranquoctuu_2123110477.Controllers
             _context = context;
         }
 
-        // GỘP 2 GET THÀNH 1
-        // GET: api/Products
-        // GET: api/Products/5
-        [HttpGet("{id?}")]
-        public async Task<ActionResult<object>> GetProducts(int? id)
         {
-            if (_context.Products == null)
-                return NotFound();
 
-            // Trường hợp 1: Lấy chi tiết sản phẩm theo ID
-            if (id.HasValue)
-            {
-                var data = await _context.Products
-                    .FirstOrDefaultAsync(x => x.Id == id.Value && !x.IsDeleted);
+        {
+            var data = await _context.Products
 
-                if (data == null)
-                    return NotFound($"Không tìm thấy sản phẩm với Id = {id.Value}");
+            if (data == null)
 
-                return Ok(data);
-            }
+        }
 
             // Trường hợp 2: Lấy toàn bộ danh sách sản phẩm chưa xóa, mới nhất lên đầu
             var list = await _context.Products
@@ -59,16 +47,11 @@ namespace tranquoctuu_2123110477.Controllers
             _context.Products.Add(model);
             await _context.SaveChangesAsync();
 
-            // Trỏ về GetProducts (hàm đã gộp)
-            return CreatedAtAction(nameof(GetProducts), new { id = model.Id }, model);
         }
 
-        // PUT: api/Products/5
         [HttpPut("{id}")]
         public async Task<IActionResult> Update(int id, Product model)
         {
-            if (id != model.Id)
-                return BadRequest("Id không khớp");
 
             var existing = await _context.Products.FindAsync(id);
 
@@ -86,7 +69,7 @@ namespace tranquoctuu_2123110477.Controllers
 
             try
             {
-                await _context.SaveChangesAsync();
+            await _context.SaveChangesAsync();
             }
             catch (DbUpdateConcurrencyException)
             {
@@ -97,7 +80,6 @@ namespace tranquoctuu_2123110477.Controllers
             return NoContent();
         }
 
-        // DELETE: api/Products/5 (Xóa mềm)
         [HttpDelete("{id}")]
         public async Task<IActionResult> Delete(int id)
         {

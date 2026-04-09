@@ -18,12 +18,10 @@ namespace tranquoctuu_2123110477.Models
 
         public string Description { get; set; }
 
-        // Khóa ngoại liên kết tới Category
-        public int CategoryId { get; set; }
 
         [ForeignKey("CategoryId")]
         public virtual Category? Category { get; set; }
-
+        
         public List<OrderItem>? OrderItems { get; set; }
     }
 }

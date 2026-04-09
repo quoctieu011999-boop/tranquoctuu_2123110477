@@ -16,40 +16,72 @@ namespace tranquoctuu_2123110477.Controllers
             _context = context;
         }
 
-        [HttpGet("{id?}")]
-        public async Task<ActionResult<object>> GetInteractions(int? id)
+    
+        [HttpGet]
+        public async Task<ActionResult<IEnumerable<CustomerInteraction>>> GetCustomerInteractions()
         {
-            var query = _context.CustomerInteractions
-                .Include(x => x.Customer)
-                .Where(x => !x.IsDeleted);
+            return await _context.CustomerInteractions
+                                 .Include(ci => ci.Customer)
+                                 .ToListAsync();
+        }
 
-            if (id.HasValue)
+        
+        [HttpGet("{id}")]
+        public async Task<ActionResult<CustomerInteraction>> GetCustomerInteraction(int id)
+        {
+            var interaction = await _context.CustomerInteractions
+                                            .Include(ci => ci.Customer)
+                                            .FirstOrDefaultAsync(ci => ci.Id == id);
+
+            if (interaction == null)
             {
-                var data = await query.FirstOrDefaultAsync(x => x.Id == id.Value);
-                if (data == null) return NotFound();
-                return Ok(data);
+                return NotFound($"Không tìm thấy tương tác với Id = {id}");
             }
 
-            return Ok(await query.OrderByDescending(x => x.CreatedAt).ToListAsync());
+            return interaction;
         }
 
         [HttpPost]
-        public async Task<ActionResult<CustomerInteraction>> Create(CustomerInteraction model)
+        public async Task<ActionResult<CustomerInteraction>> PostCustomerInteraction(CustomerInteraction interaction)
         {
-            model.CreatedAt = DateTime.Now;
-            _context.CustomerInteractions.Add(model);
+            _context.CustomerInteractions.Add(interaction);
             await _context.SaveChangesAsync();
-            return CreatedAtAction(nameof(GetInteractions), new { id = model.Id }, model);
+
+            return CreatedAtAction(nameof(GetCustomerInteraction), new { id = interaction.Id }, interaction);
         }
 
+       
+        [HttpPut("{id}")]
+        public async Task<IActionResult> PutCustomerInteraction(int id, CustomerInteraction interaction)
+        {
+            if (id != interaction.Id)
+            {
+                return BadRequest("Id không khớp.");
+            }
+
+            _context.Entry(interaction).State = EntityState.Modified;
+
+            try
+            {
+                await _context.SaveChangesAsync();
+            }
+            catch (DbUpdateConcurrencyException)
+            {
+                if (!InteractionExists(id)) return NotFound();
+                else throw;
+            }
+
+            return NoContent();
+        }
+
+      
         [HttpDelete("{id}")]
         public async Task<IActionResult> Delete(int id)
         {
-            var data = await _context.CustomerInteractions.FindAsync(id);
-            if (data == null || data.IsDeleted) return NotFound();
+            var interaction = await _context.CustomerInteractions.FindAsync(id);
+            if (interaction == null) return NotFound();
 
-            data.IsDeleted = true;
-            data.DeletedAt = DateTime.Now;
+            _context.CustomerInteractions.Remove(interaction);
             await _context.SaveChangesAsync();
             return NoContent();
         }

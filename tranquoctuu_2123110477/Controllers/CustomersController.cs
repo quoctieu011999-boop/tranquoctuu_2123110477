@@ -16,23 +16,34 @@ namespace ConnectDB.Controllers
             _context = context;
         }
 
-    
-        [HttpGet("{id?}")]
-        public async Task<ActionResult<object>> GetCustomers(int? id)
+        
+        [HttpGet]
+        public async Task<ActionResult<IEnumerable<Customer>>> GetCustomers()
         {
             if (_context.Customers == null)
-                return NotFound("Entity set 'Customers' is null.");
-
-            // Nếu có ID: Trả về 1 khách hàng cụ thể
-            if (id.HasValue)
             {
-                var customer = await _context.Customers
-                    .FirstOrDefaultAsync(c => c.Id == id.Value && c.DeletedAt == null);
+                return NotFound("Entity set 'AppDbContext.Customers' is null.");
+            }
+            return await _context.Customers.ToListAsync();
+        }
 
-                if (customer == null)
-                    return NotFound($"Không tìm thấy khách hàng với Id = {id.Value}");
 
-                return Ok(customer);
+        [HttpGet("{id}")]
+        public async Task<ActionResult<Customer>> GetCustomer(int id)
+        {
+            if (_context.Customers == null)
+            {
+                return NotFound();
+            }
+
+          
+            var customer = await _context.Customers
+                                      
+                                         .FirstOrDefaultAsync(c => c.Id == id);
+
+            if (customer == null)
+            {
+                return NotFound($"Không tìm thấy khách hàng với Id = {id}");
             }
 
             // Nếu không có ID: Trả về toàn bộ danh sách chưa xóa
@@ -43,6 +54,7 @@ namespace ConnectDB.Controllers
             return Ok(list);
         }
 
+       
         [HttpPost]
         public async Task<ActionResult<Customer>> PostCustomer(Customer customer)
         {
@@ -54,47 +66,41 @@ namespace ConnectDB.Controllers
             _context.Customers.Add(customer);
             await _context.SaveChangesAsync();
 
-            // Sửa lại nameof để trỏ đúng về hàm GetCustomers ở trên
-            return CreatedAtAction(nameof(GetCustomers), new { id = customer.Id }, customer);
+         
+            return CreatedAtAction(nameof(GetCustomer), new { id = customer.Id }, customer);
         }
 
         [HttpPut("{id}")]
         public async Task<IActionResult> PutCustomer(int id, Customer customer)
         {
             if (id != customer.Id)
-                return BadRequest("Id không khớp");
+            {
+                return BadRequest("Id trên URL không khớp với Id của model.");
+            }
 
-            var existingCustomer = await _context.Customers.FindAsync(id);
-            if (existingCustomer == null)
-                return NotFound();
-
-            var username = User.Identity?.Name ?? "admin";
-
-            existingCustomer.Name = customer.Name;
-            existingCustomer.Email = customer.Email;
-            existingCustomer.UpdatedBy = username;
-            existingCustomer.UpdatedAt = DateTime.Now;
+            _context.Entry(customer).State = EntityState.Modified;
 
             await _context.SaveChangesAsync();
 
             return NoContent();
         }
 
+       
         [HttpDelete("{id}")]
         public async Task<IActionResult> DeleteCustomer(int id)
         {
-            var customer = await _context.Customers.FindAsync(id);
-
-            if (customer == null || customer.DeletedAt != null)
+            if (_context.Customers == null)
+            {
                 return NotFound();
+            }
 
-            var username = User.Identity?.Name ?? "admin";
+            var customer = await _context.Customers.FindAsync(id);
+            if (customer == null)
+            {
+                return NotFound($"Không tìm thấy khách hàng với Id = {id}");
+            }
 
-            customer.IsDeleted = true;
-            customer.DeletedAt = DateTime.Now;
-            customer.DeletedBy = username;
-
-            _context.Entry(customer).State = EntityState.Modified;
+            _context.Customers.Remove(customer);
             await _context.SaveChangesAsync();
 
             return NoContent();

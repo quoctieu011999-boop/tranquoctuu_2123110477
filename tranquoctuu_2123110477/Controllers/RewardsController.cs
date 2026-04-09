@@ -16,81 +16,42 @@ namespace tranquoctuu_2123110477.Controllers
             _context = context;
         }
 
-        // GỘP 2 GET THÀNH 1
-        // GET: api/Rewards
-        // GET: api/Rewards/5
-        [HttpGet("{id?}")]
-        public async Task<ActionResult<object>> GetRewards(int? id)
+       
+        [HttpGet]
+        public async Task<ActionResult<IEnumerable<Reward>>> GetRewards()
         {
-            if (_context.Rewards == null)
-                return NotFound();
-
-            // Trường hợp 1: Lấy chi tiết phần thưởng theo ID
-            if (id.HasValue)
-            {
-                var data = await _context.Rewards
-                    .FirstOrDefaultAsync(x => x.Id == id.Value && !x.IsDeleted);
-
-                if (data == null)
-                    return NotFound($"Không tìm thấy phần thưởng Id = {id.Value}");
-
-                return Ok(data);
-            }
-
-            // Trường hợp 2: Lấy toàn bộ danh sách phần thưởng chưa xóa, mới nhất lên đầu
-            var list = await _context.Rewards
-                .Where(x => !x.IsDeleted)
-                .OrderByDescending(x => x.CreatedAt)
-                .ToListAsync();
-
-            return Ok(list);
+            return await _context.Rewards.ToListAsync();
         }
 
-        // POST: api/Rewards
-        [HttpPost]
-        public async Task<ActionResult<Reward>> Create(Reward model)
+   
+        [HttpGet("{id}")]
+        public async Task<ActionResult<Reward>> GetReward(int id)
         {
-            if (model == null) return BadRequest("Dữ liệu không hợp lệ");
+            var reward = await _context.Rewards.FindAsync(id);
 
-            // Kiểm tra các điều kiện nghiệp vụ cơ bản
-            if (model.PointCost <= 0)
-                return BadRequest("Giá trị điểm đổi (PointCost) phải lớn hơn 0");
+            if (reward == null)
+            {
+                return NotFound($"Không tìm thấy quà tặng với Id = {id}");
+            }
 
-            if (model.Quantity < 0)
-                return BadRequest("Số lượng phần thưởng không được âm");
+            return reward;
+        }
 
-            model.CreatedAt = DateTime.Now;
-            model.CreatedBy = "admin";
-            model.IsDeleted = false;
-
-            _context.Rewards.Add(model);
+        
+        [HttpPost]
+        public async Task<ActionResult<Reward>> PostReward(Reward reward)
+        {
+            _context.Rewards.Add(reward);
             await _context.SaveChangesAsync();
 
-            // Trỏ về GetRewards (hàm đã gộp)
-            return CreatedAtAction(nameof(GetRewards), new { id = model.Id }, model);
+            return CreatedAtAction(nameof(GetReward), new { id = reward.Id }, reward);
         }
 
         // PUT: api/Rewards/5
         [HttpPut("{id}")]
         public async Task<IActionResult> Update(int id, Reward model)
         {
-            if (id != model.Id)
-                return BadRequest("Id không khớp");
-
-            var existing = await _context.Rewards.FindAsync(id);
-
-            if (existing == null || existing.IsDeleted)
-                return NotFound();
-
-            // Kiểm tra lại tính hợp lệ của dữ liệu cập nhật
-            if (model.PointCost <= 0)
-                return BadRequest("PointCost phải lớn hơn 0");
-
-            // Cập nhật các trường thông tin
-            existing.Name = model.Name;
-            existing.Description = model.Description;
-            existing.PointCost = model.PointCost;
-            existing.Quantity = model.Quantity;
+            if (id != reward.Id) return BadRequest();
 
             existing.UpdatedAt = DateTime.Now;
             existing.UpdatedBy = "admin";
@@ -101,26 +62,19 @@ namespace tranquoctuu_2123110477.Controllers
             }
             catch (DbUpdateConcurrencyException)
             {
-                if (!Exists(id)) return NotFound();
+                if (!RewardExists(id)) return NotFound();
                 else throw;
             }
 
             return NoContent();
         }
 
-        // DELETE: api/Rewards/5 (Xóa mềm)
+       
         [HttpDelete("{id}")]
         public async Task<IActionResult> Delete(int id)
         {
-            var data = await _context.Rewards.FindAsync(id);
-
-            if (data == null || data.IsDeleted)
-                return NotFound();
-
-            // Thực hiện xóa mềm
-            data.IsDeleted = true;
-            data.DeletedAt = DateTime.Now;
-            data.DeletedBy = "admin";
+            var reward = await _context.Rewards.FindAsync(id);
+            if (reward == null) return NotFound();
 
             await _context.SaveChangesAsync();
 

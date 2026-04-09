@@ -16,60 +16,47 @@ namespace tranquoctuu_2123110477.Controllers
             _context = context;
         }
 
-        // GỘP 2 GET THÀNH 1
-        // GET: api/LoyaltyTransactions
-        // GET: api/LoyaltyTransactions/5
-        [HttpGet("{id?}")]
-        public async Task<ActionResult<object>> GetLoyaltyTransactions(int? id)
+        
+        [HttpGet]
+        public async Task<ActionResult<IEnumerable<LoyaltyTransaction>>> GetLoyaltyTransactions()
         {
-            if (_context.LoyaltyTransactions == null)
-                return NotFound();
-
-            var query = _context.LoyaltyTransactions
-                .Where(x => !x.IsDeleted)
-                .Include(x => x.Customer);
-
-            // Trường hợp 1: Lấy chi tiết theo ID
-            if (id.HasValue)
-            {
-                var data = await query.FirstOrDefaultAsync(x => x.Id == id.Value);
-
-                if (data == null)
-                    return NotFound($"Không tìm thấy giao dịch Id = {id.Value}");
-
-                return Ok(data);
-            }
-
-            // Trường hợp 2: Lấy danh sách giao dịch mới nhất lên đầu
-            var list = await query.OrderByDescending(x => x.CreatedAt).ToListAsync();
-
-            return Ok(list);
+            return await _context.LoyaltyTransactions
+                                 .Include(lt => lt.Customer)
+                                 .OrderByDescending(lt => lt.CreatedAt)
+                                 .ToListAsync();
         }
 
-        // POST: api/LoyaltyTransactions
+        [HttpGet("{id}")]
+        public async Task<ActionResult<LoyaltyTransaction>> GetLoyaltyTransaction(int id)
+        {
+            var transaction = await _context.LoyaltyTransactions
+                                            .Include(lt => lt.Customer)
+                                            .FirstOrDefaultAsync(lt => lt.Id == id);
+
+            if (transaction == null)
+            {
+                return NotFound($"Không tìm thấy giao dịch với Id = {id}");
+            }
+
+            return transaction;
+        }
+
+       
         [HttpPost]
         public async Task<ActionResult<LoyaltyTransaction>> Create(LoyaltyTransaction model)
         {
-            if (model == null) return BadRequest("Dữ liệu không hợp lệ");
+          
+            var lastTransaction = await _context.LoyaltyTransactions
+                                                .OrderByDescending(t => t.Id)
+                                                .FirstOrDefaultAsync();
 
-            // LOGIC BLOCKCHAIN: Lấy giao dịch cuối cùng để lấy Hash cũ nối chuỗi
-            var last = await _context.LoyaltyTransactions
-                .OrderByDescending(x => x.Id)
-                .FirstOrDefaultAsync();
+            transaction.PreviousHash = lastTransaction?.Hash ?? "0";
+            transaction.CreatedAt = DateTime.Now;
 
-            model.PreviousHash = last?.Hash ?? "0";
-            model.CreatedAt = DateTime.Now;
-            model.CreatedBy = "admin";
-            model.IsDeleted = false;
-
-            // Tính toán mã Hash cho giao dịch mới (Yêu cầu hàm CalculateHash đã có trong Model)
-            model.Hash = model.CalculateHash();
-
-            _context.LoyaltyTransactions.Add(model);
+            _context.LoyaltyTransactions.Add(transaction);
             await _context.SaveChangesAsync();
 
-            // Trỏ về GetLoyaltyTransactions (hàm đã gộp)
-            return CreatedAtAction(nameof(GetLoyaltyTransactions), new { id = model.Id }, model);
+            return CreatedAtAction(nameof(GetLoyaltyTransaction), new { id = transaction.Id }, transaction);
         }
 
         // PUT: api/LoyaltyTransactions/5 (Chặn chỉnh sửa để đảm bảo tính minh bạch)
@@ -123,7 +110,7 @@ namespace tranquoctuu_2123110477.Controllers
             return Ok("Hệ thống dữ liệu an toàn và nhất quán ✅");
         }
 
-        private bool Exists(int id)
+        private bool LoyaltyTransactionExists(int id)
         {
             return _context.LoyaltyTransactions.Any(e => e.Id == id && !e.IsDeleted);
         }

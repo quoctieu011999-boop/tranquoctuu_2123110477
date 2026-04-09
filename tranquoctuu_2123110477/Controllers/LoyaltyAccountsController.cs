@@ -16,84 +16,59 @@ namespace tranquoctuu_2123110477.Controllers
             _context = context;
         }
 
-        // GỘP 2 GET THÀNH 1
-        // GET: api/LoyaltyAccounts
-        // GET: api/LoyaltyAccounts/5
-        [HttpGet("{id?}")]
-        public async Task<ActionResult<object>> GetLoyaltyAccounts(int? id)
+      
+        [HttpGet]
+        public async Task<ActionResult<IEnumerable<LoyaltyAccount>>> GetLoyaltyAccounts()
         {
-            if (_context.LoyaltyAccounts == null)
-                return NotFound();
-
-            // Thiết lập truy vấn cơ bản kèm dữ liệu Customer
-            var query = _context.LoyaltyAccounts
-                .Where(x => !x.IsDeleted)
-                .Include(x => x.Customer);
-
-            // Trường hợp 1: Lấy chi tiết theo ID
-            if (id.HasValue)
-            {
-                var data = await query.FirstOrDefaultAsync(x => x.Id == id.Value);
-
-                if (data == null)
-                    return NotFound("Không tìm thấy tài khoản loyalty");
-
-                return Ok(data);
-            }
-
-            // Trường hợp 2: Lấy toàn bộ danh sách chưa xóa
-            var list = await query.ToListAsync();
-
-            return Ok(list);
+            
+            return await _context.LoyaltyAccounts
+                                 .Include(la => la.Customer)
+                                 .ToListAsync();
         }
 
-        // POST: api/LoyaltyAccounts
+       
+        [HttpGet("{id}")]
+        public async Task<ActionResult<LoyaltyAccount>> GetLoyaltyAccount(int id)
+        {
+            var loyaltyAccount = await _context.LoyaltyAccounts
+                                               .Include(la => la.Customer)
+                                               .FirstOrDefaultAsync(la => la.Id == id);
+
+            if (loyaltyAccount == null)
+            {
+                return NotFound($"Không tìm thấy tài khoản loyalty với Id = {id}");
+            }
+
+            return loyaltyAccount;
+        }
+
+        
         [HttpPost]
         public async Task<ActionResult<LoyaltyAccount>> PostLoyaltyAccount(LoyaltyAccount model)
         {
-            if (model == null) return BadRequest();
-
-            model.CreatedAt = DateTime.Now;
-            model.CreatedBy = "admin";
-            model.UpdatedAt = DateTime.Now;
-            model.UpdatedBy = "admin";
-            model.IsDeleted = false;
+            
+            loyaltyAccount.UpdatedAt = DateTime.Now;
 
             _context.LoyaltyAccounts.Add(model);
             await _context.SaveChangesAsync();
 
-            // Trỏ về hàm GetLoyaltyAccounts (đã gộp)
-            return CreatedAtAction(nameof(GetLoyaltyAccounts), new { id = model.Id }, model);
+            return CreatedAtAction(nameof(GetLoyaltyAccount), new { id = loyaltyAccount.Id }, loyaltyAccount);
         }
 
-        // PUT: api/LoyaltyAccounts/5
+        
         [HttpPut("{id}")]
-        public async Task<IActionResult> PutLoyaltyAccount(int id, LoyaltyAccount model)
+        public async Task<IActionResult> PutLoyaltyAccount(int id, LoyaltyAccount loyaltyAccount)
         {
-            if (id != model.Id)
-                return BadRequest("Id không trùng");
-
-            var existing = await _context.LoyaltyAccounts.FindAsync(id);
-            if (existing == null || existing.IsDeleted)
-                return NotFound();
-
-            // Cập nhật thông tin từ model truyền vào
-            existing.CustomerId = model.CustomerId;
-            existing.Points = model.Points;
-            existing.Level = model.Level;
-
-            existing.UpdatedAt = DateTime.Now;
-            existing.UpdatedBy = "admin";
-
-            try
+            if (id != loyaltyAccount.Id)
             {
-                await _context.SaveChangesAsync();
+                return BadRequest("Id không trùng khớp.");
             }
-            catch (DbUpdateConcurrencyException)
-            {
-                if (!LoyaltyAccountExists(id)) return NotFound();
-                else throw;
-            }
+
+            
+            loyaltyAccount.UpdatedAt = DateTime.Now;
+            _context.Entry(loyaltyAccount).State = EntityState.Modified;
+
+            await _context.SaveChangesAsync();
 
             return NoContent();
         }
@@ -102,14 +77,8 @@ namespace tranquoctuu_2123110477.Controllers
         [HttpDelete("{id}")]
         public async Task<IActionResult> DeleteLoyaltyAccount(int id)
         {
-            var data = await _context.LoyaltyAccounts.FindAsync(id);
-            if (data == null || data.IsDeleted)
-                return NotFound();
-
-            // Thực hiện xóa mềm
-            data.IsDeleted = true;
-            data.DeletedAt = DateTime.Now;
-            data.DeletedBy = "admin";
+            var loyaltyAccount = await _context.LoyaltyAccounts.FindAsync(id);
+            if (loyaltyAccount == null) return NotFound();
 
             await _context.SaveChangesAsync();
 
