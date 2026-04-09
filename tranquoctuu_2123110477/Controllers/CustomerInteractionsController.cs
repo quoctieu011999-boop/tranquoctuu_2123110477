@@ -16,7 +16,6 @@ namespace tranquoctuu_2123110477.Controllers
             _context = context;
         }
 
-    
         [HttpGet]
         public async Task<ActionResult<IEnumerable<CustomerInteraction>>> GetCustomerInteractions()
         {
@@ -25,7 +24,6 @@ namespace tranquoctuu_2123110477.Controllers
                                  .ToListAsync();
         }
 
-        
         [HttpGet("{id}")]
         public async Task<ActionResult<CustomerInteraction>> GetCustomerInteraction(int id)
         {
@@ -50,7 +48,6 @@ namespace tranquoctuu_2123110477.Controllers
             return CreatedAtAction(nameof(GetCustomerInteraction), new { id = interaction.Id }, interaction);
         }
 
-       
         [HttpPut("{id}")]
         public async Task<IActionResult> PutCustomerInteraction(int id, CustomerInteraction interaction)
         {
@@ -67,6 +64,7 @@ namespace tranquoctuu_2123110477.Controllers
             }
             catch (DbUpdateConcurrencyException)
             {
+                // Gọi hàm helper ở dưới để kiểm tra tồn tại
                 if (!InteractionExists(id)) return NotFound();
                 else throw;
             }
@@ -74,7 +72,6 @@ namespace tranquoctuu_2123110477.Controllers
             return NoContent();
         }
 
-      
         [HttpDelete("{id}")]
         public async Task<IActionResult> Delete(int id)
         {
@@ -84,6 +81,12 @@ namespace tranquoctuu_2123110477.Controllers
             _context.CustomerInteractions.Remove(interaction);
             await _context.SaveChangesAsync();
             return NoContent();
+        }
+
+        // --- ĐÂY LÀ PHẦN THIẾU CẦN THÊM VÀO ĐỂ FIX LỖI CS0103 ---
+        private bool InteractionExists(int id)
+        {
+            return (_context.CustomerInteractions?.Any(e => e.Id == id)).GetValueOrDefault();
         }
     }
 }

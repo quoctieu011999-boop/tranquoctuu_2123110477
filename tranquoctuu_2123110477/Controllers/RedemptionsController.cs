@@ -54,7 +54,7 @@ namespace tranquoctuu_2123110477.Controllers
                 return BadRequest("CustomerId hoặc RewardId không hợp lệ.");
             }
 
-            model.RedeemedAt = DateTime.Now; // Đảm bảo ghi nhận thời gian đổi quà
+            model.RedeemedAt = DateTime.Now; 
             model.IsDeleted = false;
 
             _context.Redemptions.Add(model);
