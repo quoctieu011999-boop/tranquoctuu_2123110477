@@ -16,7 +16,6 @@ namespace tranquoctuu_2123110477.Controllers
             _context = context;
         }
 
-        
         [HttpGet]
         public async Task<ActionResult<IEnumerable<LoyaltyTransaction>>> GetLoyaltyTransactions()
         {
@@ -41,32 +40,35 @@ namespace tranquoctuu_2123110477.Controllers
             return transaction;
         }
 
-       
         [HttpPost]
         public async Task<ActionResult<LoyaltyTransaction>> Create(LoyaltyTransaction model)
         {
-          
             var lastTransaction = await _context.LoyaltyTransactions
-                                                .OrderByDescending(t => t.Id)
-                                                .FirstOrDefaultAsync();
+                                                 .OrderByDescending(t => t.Id)
+                                                 .FirstOrDefaultAsync();
 
-            transaction.PreviousHash = lastTransaction?.Hash ?? "0";
-            transaction.CreatedAt = DateTime.Now;
+            // SỬA LỖI TẠI ĐÂY: Dùng 'model' thay vì 'transaction'
+            model.PreviousHash = lastTransaction?.Hash ?? "0";
+            model.CreatedAt = DateTime.Now;
 
-            _context.LoyaltyTransactions.Add(transaction);
+            // Nếu bạn có hàm tính Hash trong Model, hãy gọi nó trước khi lưu
+            if (model.GetType().GetMethod("CalculateHash") != null)
+            {
+                model.Hash = model.CalculateHash();
+            }
+
+            _context.LoyaltyTransactions.Add(model);
             await _context.SaveChangesAsync();
 
-            return CreatedAtAction(nameof(GetLoyaltyTransaction), new { id = transaction.Id }, transaction);
+            return CreatedAtAction(nameof(GetLoyaltyTransaction), new { id = model.Id }, model);
         }
 
-        // PUT: api/LoyaltyTransactions/5 (Chặn chỉnh sửa để đảm bảo tính minh bạch)
         [HttpPut("{id}")]
         public IActionResult BlockUpdate()
         {
             return BadRequest("Nguyên tắc bất biến: Không được phép sửa đổi lịch sử giao dịch!");
         }
 
-        // DELETE: api/LoyaltyTransactions/5 (Xóa mềm)
         [HttpDelete("{id}")]
         public async Task<IActionResult> SoftDelete(int id)
         {
@@ -82,12 +84,9 @@ namespace tranquoctuu_2123110477.Controllers
             return NoContent();
         }
 
-        // API KIỂM TRA TÍNH TOÀN VẸN (VERIFY DATA)
-        // GET: api/LoyaltyTransactions/verify
         [HttpGet("verify")]
         public async Task<IActionResult> VerifyChain()
         {
-            // Lấy toàn bộ chuỗi giao dịch theo thứ tự thời gian
             var list = await _context.LoyaltyTransactions
                 .Where(x => !x.IsDeleted)
                 .OrderBy(x => x.Id)
@@ -98,13 +97,12 @@ namespace tranquoctuu_2123110477.Controllers
                 var current = list[i];
                 var previous = list[i - 1];
 
-                // 1. Kiểm tra liên kết PreviousHash
                 if (current.PreviousHash != previous.Hash)
                     return BadRequest($"Chuỗi dữ liệu bị đứt gãy tại Id = {current.Id}");
 
-                // 2. Kiểm tra Hash nội tại (Xác nhận dữ liệu không bị sửa lén trong DB)
+                // Chỉ kiểm tra nếu hàm CalculateHash tồn tại trong Model
                 if (current.Hash != current.CalculateHash())
-                    return BadRequest($"Dữ liệu tại Id = {current.Id} không khớp với mã Hash (có dấu hiệu bị tác động bên ngoài)");
+                    return BadRequest($"Dữ liệu tại Id = {current.Id} không khớp với mã Hash");
             }
 
             return Ok("Hệ thống dữ liệu an toàn và nhất quán ✅");

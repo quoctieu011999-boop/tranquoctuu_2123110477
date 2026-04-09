@@ -16,22 +16,22 @@ namespace tranquoctuu_2123110477.Controllers
             _context = context;
         }
 
-        // GỘP 2 GET THÀNH 1
-        [HttpGet("{id?}")]
-        public async Task<ActionResult<object>> GetCustomerChannels(int? id)
+        // Lấy danh sách tất cả kênh
+        [HttpGet]
+        public async Task<ActionResult<IEnumerable<CustomerChannel>>> GetCustomerChannels()
         {
-            
             return await _context.CustomerChannels
                                  .Include(cc => cc.Customer)
                                  .ToListAsync();
         }
 
+        // Lấy 1 kênh theo ID
         [HttpGet("{id}")]
         public async Task<ActionResult<CustomerChannel>> GetCustomerChannel(int id)
         {
             var customerChannel = await _context.CustomerChannels
-                                                .Include(cc => cc.Customer)
-                                                .FirstOrDefaultAsync(cc => cc.Id == id);
+                                                 .Include(cc => cc.Customer)
+                                                 .FirstOrDefaultAsync(cc => cc.Id == id);
 
             if (customerChannel == null)
             {
@@ -41,7 +41,6 @@ namespace tranquoctuu_2123110477.Controllers
             return customerChannel;
         }
 
-       
         [HttpPost]
         public async Task<ActionResult<CustomerChannel>> PostCustomerChannel(CustomerChannel customerChannel)
         {
@@ -51,7 +50,6 @@ namespace tranquoctuu_2123110477.Controllers
             return CreatedAtAction(nameof(GetCustomerChannel), new { id = customerChannel.Id }, customerChannel);
         }
 
-        
         [HttpPut("{id}")]
         public async Task<IActionResult> PutCustomerChannel(int id, CustomerChannel customerChannel)
         {
@@ -75,7 +73,6 @@ namespace tranquoctuu_2123110477.Controllers
             return NoContent();
         }
 
-    
         [HttpDelete("{id}")]
         public async Task<IActionResult> Delete(int id)
         {
@@ -85,6 +82,12 @@ namespace tranquoctuu_2123110477.Controllers
             _context.CustomerChannels.Remove(customerChannel);
             await _context.SaveChangesAsync();
             return NoContent();
+        }
+
+        // ĐÂY LÀ HÀM BẠN ĐANG THIẾU:
+        private bool CustomerChannelExists(int id)
+        {
+            return _context.CustomerChannels.Any(e => e.Id == id);
         }
     }
 }

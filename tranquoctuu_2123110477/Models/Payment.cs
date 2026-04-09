@@ -1,17 +1,26 @@
 ﻿using System.ComponentModel.DataAnnotations;
-namespace tranquoctuu_2123110477.Models;
+using System.ComponentModel.DataAnnotations.Schema;
 
 namespace tranquoctuu_2123110477.Models
 {
-    public int Id { get; set; }
-    public int OrderId { get; set; }
+    public class Payment
+    {
+        [Key]
+        public int Id { get; set; }
 
-    public decimal Amount { get; set; }
-    public string Method { get; set; } 
-    public string Status { get; set; } 
+        public int OrderId { get; set; }
 
-    public DateTime CreatedAt { get; set; } = DateTime.Now;
+        [Column(TypeName = "decimal(18,2)")]
+        public decimal Amount { get; set; }
 
-    public Order Order { get; set; }
+        public string Method { get; set; } = string.Empty;
+
+        public string Status { get; set; } = "Pending";
+
+        public DateTime CreatedAt { get; set; } = DateTime.Now;
+
+        // Khai báo mối quan hệ với bảng Order
+        [ForeignKey("OrderId")]
+        public virtual Order? Order { get; set; }
+    }
 }
-

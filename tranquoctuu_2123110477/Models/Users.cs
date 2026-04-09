@@ -4,7 +4,7 @@ using System.ComponentModel.DataAnnotations.Schema;
 namespace tranquoctuu_2123110477.Models
 {
     [Table("Users")]
-    public class User : BaseEntity
+    public class Users : BaseEntity
     {
         [Key]
         public int Id { get; set; }

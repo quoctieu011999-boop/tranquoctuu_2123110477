@@ -16,27 +16,29 @@ namespace tranquoctuu_2123110477.Controllers
             _context = context;
         }
 
-        // GET: api/Users hoặc api/Users/5
-        [HttpGet("{id?}")]
-        public async Task<ActionResult<object>> GetUsers(int? id)
+        // Tách biệt Get All và Get By Id để Swagger hiển thị rõ ràng hơn
+        [HttpGet]
+        public async Task<ActionResult<IEnumerable<Users>>> GetAllUsers()
         {
-            var query = _context.Users.Where(x => !x.IsDeleted);
-
-            if (id.HasValue)
-            {
-                var user = await query.FirstOrDefaultAsync(u => u.Id == id.Value);
-                if (user == null) return NotFound("Không tìm thấy người dùng");
-                return Ok(user);
-            }
-
-            return Ok(await query.ToListAsync());
+            return await _context.Users.Where(x => !x.IsDeleted).ToListAsync();
         }
 
-        // POST: api/Users (Tạo tài khoản)
-        [HttpPost]
-        public async Task<ActionResult<User>> Create(User model)
+        [HttpGet("{id}")]
+        public async Task<ActionResult<Users>> GetUserById(int id)
         {
-            if (_context.Users.Any(u => u.Username == model.Username))
+            var user = await _context.Users
+                                     .FirstOrDefaultAsync(u => u.Id == id && !u.IsDeleted);
+
+            if (user == null) return NotFound("Không tìm thấy người dùng");
+
+            return Ok(user);
+        }
+
+        [HttpPost]
+        public async Task<ActionResult<Users>> Create(Users model)
+        {
+            // Kiểm tra trùng tên đăng nhập
+            if (await _context.Users.AnyAsync(u => u.Username == model.Username))
                 return BadRequest("Tên đăng nhập đã tồn tại");
 
             model.CreatedAt = DateTime.Now;
@@ -45,15 +47,15 @@ namespace tranquoctuu_2123110477.Controllers
             _context.Users.Add(model);
             await _context.SaveChangesAsync();
 
-            return CreatedAtAction(nameof(GetUsers), new { id = model.Id }, model);
+            // Redirect về hàm GetUserById để lấy thông tin user vừa tạo
+            return CreatedAtAction(nameof(GetUserById), new { id = model.Id }, model);
         }
 
-        // DELETE: api/Users/5 (Xóa mềm hoặc Khóa tài khoản)
         [HttpDelete("{id}")]
         public async Task<IActionResult> Delete(int id)
         {
             var user = await _context.Users.FindAsync(id);
-            if (user == null) return NotFound();
+            if (user == null || user.IsDeleted) return NotFound();
 
             user.IsDeleted = true;
             user.DeletedAt = DateTime.Now;

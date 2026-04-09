@@ -16,13 +16,13 @@ namespace tranquoctuu_2123110477.Controllers
             _context = context;
         }
 
-      
         [HttpGet]
         public async Task<ActionResult<IEnumerable<Redemption>>> GetRedemptions()
         {
             return await _context.Redemptions
                                  .Include(r => r.Customer)
                                  .Include(r => r.Reward)
+                                 .Where(r => !r.IsDeleted) // Chỉ lấy bản ghi chưa xóa
                                  .ToListAsync();
         }
 
@@ -32,7 +32,7 @@ namespace tranquoctuu_2123110477.Controllers
             var redemption = await _context.Redemptions
                                            .Include(r => r.Customer)
                                            .Include(r => r.Reward)
-                                           .FirstOrDefaultAsync(r => r.Id == id);
+                                           .FirstOrDefaultAsync(r => r.Id == id && !r.IsDeleted);
 
             if (redemption == null)
             {
@@ -42,32 +42,33 @@ namespace tranquoctuu_2123110477.Controllers
             return redemption;
         }
 
-      
         [HttpPost]
         public async Task<ActionResult<Redemption>> Create(Redemption model)
         {
-            
-            var customerExists = await _context.Customers.AnyAsync(c => c.Id == redemption.CustomerId);
-            var rewardExists = await _context.Rewards.AnyAsync(rw => rw.Id == redemption.RewardId);
+            // SỬA LỖI: Sử dụng 'model' thay vì 'redemption'
+            var customerExists = await _context.Customers.AnyAsync(c => c.Id == model.CustomerId);
+            var rewardExists = await _context.Rewards.AnyAsync(rw => rw.Id == model.RewardId);
 
             if (!customerExists || !rewardExists)
             {
                 return BadRequest("CustomerId hoặc RewardId không hợp lệ.");
             }
 
+            model.RedeemedAt = DateTime.Now; // Đảm bảo ghi nhận thời gian đổi quà
+            model.IsDeleted = false;
+
             _context.Redemptions.Add(model);
             await _context.SaveChangesAsync();
 
-            return CreatedAtAction(nameof(GetRedemption), new { id = redemption.Id }, redemption);
+            return CreatedAtAction(nameof(GetRedemption), new { id = model.Id }, model);
         }
 
-    
         [HttpPut("{id}")]
         public async Task<IActionResult> Update(int id, Redemption model)
         {
-            if (id != redemption.Id) return BadRequest();
+            if (id != model.Id) return BadRequest("Id không khớp");
 
-            _context.Entry(redemption).State = EntityState.Modified;
+            _context.Entry(model).State = EntityState.Modified;
 
             try
             {
@@ -82,20 +83,23 @@ namespace tranquoctuu_2123110477.Controllers
             return NoContent();
         }
 
-     
         [HttpDelete("{id}")]
         public async Task<IActionResult> Delete(int id)
         {
             var redemption = await _context.Redemptions.FindAsync(id);
             if (redemption == null) return NotFound();
 
-            await _context.SaveChangesAsync();
+            // SỬA LỖI: Thực hiện xóa mềm (Soft Delete)
+            redemption.IsDeleted = true;
+            redemption.DeletedAt = DateTime.Now;
 
+            await _context.SaveChangesAsync();
             return NoContent();
         }
 
-        private bool Exists(int id)
+        private bool RedemptionExists(int id)
         {
+            // SỬA LỖI: Khớp tên hàm với phần Update
             return _context.Redemptions.Any(e => e.Id == id && !e.IsDeleted);
         }
     }

@@ -19,16 +19,16 @@ namespace tranquoctuu_2123110477.Controllers
         [HttpGet]
         public async Task<ActionResult<IEnumerable<LoyaltyRule>>> GetLoyaltyRules()
         {
-            return await _context.LoyaltyRules.ToListAsync();
+            // Chỉ lấy các quy tắc chưa bị xóa (nếu dùng soft delete)
+            return await _context.LoyaltyRules.Where(r => !r.IsDeleted).ToListAsync();
         }
 
-      
         [HttpGet("{id}")]
         public async Task<ActionResult<LoyaltyRule>> GetLoyaltyRule(int id)
         {
             var loyaltyRule = await _context.LoyaltyRules.FindAsync(id);
 
-            if (loyaltyRule == null)
+            if (loyaltyRule == null || loyaltyRule.IsDeleted)
             {
                 return NotFound($"Không tìm thấy quy tắc với Id = {id}");
             }
@@ -36,14 +36,14 @@ namespace tranquoctuu_2123110477.Controllers
             return loyaltyRule;
         }
 
-        // POST: api/LoyaltyRules
         [HttpPost]
         public async Task<ActionResult<LoyaltyRule>> PostLoyaltyRule(LoyaltyRule model)
         {
-            _context.LoyaltyRules.Add(loyaltyRule);
+            // SỬA LỖI: Sử dụng 'model' đồng nhất với tham số đầu vào
+            _context.LoyaltyRules.Add(model);
             await _context.SaveChangesAsync();
 
-            return CreatedAtAction(nameof(GetLoyaltyRule), new { id = loyaltyRule.Id }, loyaltyRule);
+            return CreatedAtAction(nameof(GetLoyaltyRule), new { id = model.Id }, model);
         }
 
         [HttpPut("{id}")]
@@ -56,17 +56,27 @@ namespace tranquoctuu_2123110477.Controllers
 
             _context.Entry(loyaltyRule).State = EntityState.Modified;
 
-            await _context.SaveChangesAsync();
+            try
+            {
+                await _context.SaveChangesAsync();
+            }
+            catch (DbUpdateConcurrencyException)
+            {
+                if (!LoyaltyRuleExists(id)) return NotFound();
+                else throw;
+            }
 
             return NoContent();
         }
 
-      
         [HttpDelete("{id}")]
         public async Task<IActionResult> DeleteLoyaltyRule(int id)
         {
             var loyaltyRule = await _context.LoyaltyRules.FindAsync(id);
             if (loyaltyRule == null) return NotFound();
+
+            // SỬA LỖI: Phải thực thi lệnh xóa (ở đây dùng Soft Delete)
+            loyaltyRule.IsDeleted = true;
 
             await _context.SaveChangesAsync();
 

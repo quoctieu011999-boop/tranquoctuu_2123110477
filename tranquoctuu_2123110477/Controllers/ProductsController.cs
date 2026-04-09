@@ -16,22 +16,32 @@ namespace tranquoctuu_2123110477.Controllers
             _context = context;
         }
 
+        // GET: api/Products
+        [HttpGet]
+        public async Task<ActionResult<IEnumerable<Product>>> GetAll()
         {
-
-        {
-            var data = await _context.Products
-
-            if (data == null)
-
-        }
-
-            // Trường hợp 2: Lấy toàn bộ danh sách sản phẩm chưa xóa, mới nhất lên đầu
+            // Lấy toàn bộ danh sách sản phẩm chưa xóa, mới nhất lên đầu
             var list = await _context.Products
                 .Where(x => !x.IsDeleted)
                 .OrderByDescending(x => x.CreatedAt)
                 .ToListAsync();
 
             return Ok(list);
+        }
+
+        // GET: api/Products/5
+        [HttpGet("{id}")]
+        public async Task<ActionResult<Product>> GetById(int id)
+        {
+            var data = await _context.Products
+                .FirstOrDefaultAsync(x => x.Id == id && !x.IsDeleted);
+
+            if (data == null)
+            {
+                return NotFound($"Không tìm thấy sản phẩm với Id = {id}");
+            }
+
+            return Ok(data);
         }
 
         // POST: api/Products
@@ -47,11 +57,14 @@ namespace tranquoctuu_2123110477.Controllers
             _context.Products.Add(model);
             await _context.SaveChangesAsync();
 
+            return CreatedAtAction(nameof(GetById), new { id = model.Id }, model);
         }
 
+        // PUT: api/Products/5
         [HttpPut("{id}")]
         public async Task<IActionResult> Update(int id, Product model)
         {
+            if (id != model.Id) return BadRequest("Id không trùng khớp");
 
             var existing = await _context.Products.FindAsync(id);
 
@@ -63,13 +76,12 @@ namespace tranquoctuu_2123110477.Controllers
             existing.Price = model.Price;
             existing.Stock = model.Stock;
             existing.Description = model.Description;
-
             existing.UpdatedAt = DateTime.Now;
             existing.UpdatedBy = "admin";
 
             try
             {
-            await _context.SaveChangesAsync();
+                await _context.SaveChangesAsync();
             }
             catch (DbUpdateConcurrencyException)
             {
@@ -80,6 +92,7 @@ namespace tranquoctuu_2123110477.Controllers
             return NoContent();
         }
 
+        // DELETE: api/Products/5
         [HttpDelete("{id}")]
         public async Task<IActionResult> Delete(int id)
         {

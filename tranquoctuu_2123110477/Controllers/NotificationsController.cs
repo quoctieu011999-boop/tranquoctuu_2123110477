@@ -16,23 +16,22 @@ namespace tranquoctuu_2123110477.Controllers
             _context = context;
         }
 
- 
         [HttpGet]
         public async Task<ActionResult<IEnumerable<Notification>>> GetNotifications()
         {
             return await _context.Notifications
                                  .Include(n => n.Customer)
+                                 .Where(n => !n.IsDeleted) // Chỉ lấy các thông báo chưa xóa
                                  .OrderByDescending(n => n.CreatedAt)
                                  .ToListAsync();
         }
 
-        
         [HttpGet("{id}")]
         public async Task<ActionResult<Notification>> GetNotification(int id)
         {
             var notification = await _context.Notifications
                                              .Include(n => n.Customer)
-                                             .FirstOrDefaultAsync(n => n.Id == id);
+                                             .FirstOrDefaultAsync(n => n.Id == id && !n.IsDeleted);
 
             if (notification == null)
             {
@@ -42,30 +41,32 @@ namespace tranquoctuu_2123110477.Controllers
             return notification;
         }
 
-      
         [HttpPost]
         public async Task<ActionResult<Notification>> PostNotification(Notification notification)
         {
             notification.CreatedAt = DateTime.Now;
+            notification.IsDeleted = false; // Đảm bảo trạng thái mặc định
+
             _context.Notifications.Add(notification);
             await _context.SaveChangesAsync();
 
-            return NoContent();
+            // Sửa lỗi: Trả về CreatedAtAction thay vì NoContent để đúng chuẩn RESTful
+            return CreatedAtAction(nameof(GetNotification), new { id = notification.Id }, notification);
         }
 
-      
         [HttpPatch("{id}/mark-as-sent")]
         public async Task<IActionResult> MarkAsSent(int id)
         {
             var notification = await _context.Notifications.FindAsync(id);
-            if (notification == null) return NotFound();
+            if (notification == null || notification.IsDeleted) return NotFound();
+
+            // SỬA LỖI: Phải gán giá trị thay đổi trước khi Save
+            notification.IsSent = true;
 
             await _context.SaveChangesAsync();
-
             return NoContent();
         }
 
-       
         [HttpDelete("{id}")]
         public async Task<IActionResult> Delete(int id)
         {
@@ -73,12 +74,12 @@ namespace tranquoctuu_2123110477.Controllers
             if (data == null || data.IsDeleted)
                 return NotFound();
 
+            // Logic Soft Delete
             data.IsDeleted = true;
             data.DeletedAt = DateTime.Now;
             data.DeletedBy = "admin";
 
             await _context.SaveChangesAsync();
-
             return NoContent();
         }
 

@@ -16,7 +16,6 @@ namespace tranquoctuu_2123110477.Controllers
             _context = context;
         }
 
-        
         [HttpGet]
         public async Task<ActionResult<IEnumerable<Payment>>> GetPayments()
         {
@@ -26,13 +25,12 @@ namespace tranquoctuu_2123110477.Controllers
                                  .ToListAsync();
         }
 
-      
         [HttpGet("{id}")]
         public async Task<ActionResult<Payment>> GetPayment(int id)
         {
             var payment = await _context.Payments
-                                        .Include(p => p.Order)
-                                        .FirstOrDefaultAsync(p => p.Id == id);
+                                         .Include(p => p.Order)
+                                         .FirstOrDefaultAsync(p => p.Id == id);
 
             if (payment == null)
             {
@@ -42,31 +40,30 @@ namespace tranquoctuu_2123110477.Controllers
             return payment;
         }
 
-      
         [HttpPost]
         public async Task<ActionResult<Payment>> Create(Payment model)
         {
-           
-            var orderExists = await _context.Orders.AnyAsync(o => o.Id == payment.OrderId);
+            // SỬA LỖI: Dùng 'model' đồng nhất với tham số đầu vào
+            var orderExists = await _context.Orders.AnyAsync(o => o.Id == model.OrderId);
             if (!orderExists)
             {
                 return BadRequest("Mã đơn hàng (OrderId) không tồn tại.");
             }
 
-            payment.CreatedAt = DateTime.Now;
-            _context.Payments.Add(payment);
+            model.CreatedAt = DateTime.Now;
+            _context.Payments.Add(model);
             await _context.SaveChangesAsync();
 
-            return CreatedAtAction(nameof(GetPayment), new { id = payment.Id }, payment);
+            return CreatedAtAction(nameof(GetPayment), new { id = model.Id }, model);
         }
 
-       
         [HttpPut("{id}")]
         public async Task<IActionResult> Update(int id, Payment model)
         {
-            if (id != payment.Id) return BadRequest();
+            // SỬA LỖI: Kiểm tra Id từ 'model'
+            if (id != model.Id) return BadRequest("Id không trùng khớp.");
 
-            _context.Entry(payment).State = EntityState.Modified;
+            _context.Entry(model).State = EntityState.Modified;
 
             try
             {
@@ -78,26 +75,26 @@ namespace tranquoctuu_2123110477.Controllers
                 else throw;
             }
 
-            await _context.SaveChangesAsync();
-
             return NoContent();
         }
 
-        
         [HttpDelete("{id}")]
         public async Task<IActionResult> Delete(int id)
         {
             var payment = await _context.Payments.FindAsync(id);
             if (payment == null) return NotFound();
 
-            await _context.SaveChangesAsync();
+            // SỬA LỖI: Thực hiện lệnh xóa thực tế khỏi Database
+            _context.Payments.Remove(payment);
 
+            await _context.SaveChangesAsync();
             return NoContent();
         }
 
-        private bool Exists(int id)
+        private bool PaymentExists(int id)
         {
-            return _context.Payments.Any(e => e.Id == id && !e.IsDeleted);
+            // SỬA LỖI: Đổi tên hàm thành PaymentExists cho khớp với hàm Update ở trên
+            return _context.Payments.Any(e => e.Id == id);
         }
     }
 }

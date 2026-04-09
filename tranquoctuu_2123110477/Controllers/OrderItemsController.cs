@@ -16,7 +16,6 @@ namespace tranquoctuu_2123110477.Controllers
             _context = context;
         }
 
-        
         [HttpGet]
         public async Task<ActionResult<IEnumerable<OrderItem>>> GetOrderItems()
         {
@@ -25,7 +24,15 @@ namespace tranquoctuu_2123110477.Controllers
                                  .ToListAsync();
         }
 
-       
+        // Thêm hàm Get theo ID để phục vụ hàm Create
+        [HttpGet("{id}")]
+        public async Task<ActionResult<OrderItem>> GetOrderItem(int id)
+        {
+            var item = await _context.OrderItems.FindAsync(id);
+            if (item == null) return NotFound();
+            return item;
+        }
+
         [HttpGet("order/{orderId}")]
         public async Task<ActionResult<IEnumerable<object>>> GetByOrder(int orderId)
         {
@@ -38,23 +45,23 @@ namespace tranquoctuu_2123110477.Controllers
             return Ok(items);
         }
 
-        
         [HttpPost]
         public async Task<ActionResult<OrderItem>> Create(OrderItem model)
         {
-            _context.OrderItems.Add(orderItem);
+            // SỬA LỖI: Dùng 'model' thay vì 'orderItem'
+            _context.OrderItems.Add(model);
             await _context.SaveChangesAsync();
 
-            return CreatedAtAction(nameof(GetOrderItems), new { id = orderItem.Id }, orderItem);
+            return CreatedAtAction(nameof(GetOrderItem), new { id = model.Id }, model);
         }
 
-  
         [HttpPut("{id}")]
         public async Task<IActionResult> Update(int id, OrderItem model)
         {
-            if (id != orderItem.Id) return BadRequest();
+            // SỬA LỖI: Dùng 'model' đồng nhất
+            if (id != model.Id) return BadRequest("Id không khớp");
 
-            _context.Entry(orderItem).State = EntityState.Modified;
+            _context.Entry(model).State = EntityState.Modified;
 
             try
             {
@@ -69,7 +76,6 @@ namespace tranquoctuu_2123110477.Controllers
             return NoContent();
         }
 
-      
         [HttpDelete("{id}")]
         public async Task<IActionResult> Delete(int id)
         {
