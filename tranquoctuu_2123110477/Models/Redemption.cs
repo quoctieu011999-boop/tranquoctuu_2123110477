@@ -23,5 +23,6 @@ namespace tranquoctuu_2123110477.Models
 
         [JsonIgnore] // 3. Thêm cái này để Swagger không bắt nhập dữ liệu Reward
         public virtual Reward? Reward { get; set; }
+
     }
 }

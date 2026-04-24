@@ -17,6 +17,7 @@ namespace tranquoctuu_2123110477.Models
         public int Stock { get; set; }
 
         public string Description { get; set; }
+        public string? Image { get; set; }
 
 
         [ForeignKey("CategoryId")]

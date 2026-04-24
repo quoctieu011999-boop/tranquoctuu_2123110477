@@ -3,11 +3,23 @@ using tranquoctuu_2123110477.Data;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// 1. Đăng ký SQL Server
+// 1. Cấu hình CORS
+builder.Services.AddCors(options =>
+{
+    options.AddPolicy("AllowAll",
+        policy =>
+        {
+            policy.AllowAnyOrigin()
+                  .AllowAnyHeader()
+                  .AllowAnyMethod();
+        });
+});
+
+// 2. Đăng ký SQL Server
 builder.Services.AddDbContext<AppDbContext>(options =>
     options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection")));
 
-// 2. Cấu hình Controller và chống lỗi vòng lặp JSON
+// 3. Controller & JSON options
 builder.Services.AddControllers()
     .AddJsonOptions(options =>
     {
@@ -19,7 +31,12 @@ builder.Services.AddSwaggerGen();
 
 var app = builder.Build();
 
-// 3. Cấu hình Swagger cho cả Dev và Production
+// --- THỨ TỰ MIDDLEWARE RẤT QUAN TRỌNG ---
+
+// A. Phục vụ file tĩnh (Ảnh trong wwwroot) - Đặt lên đầu để tối ưu hiệu suất
+app.UseStaticFiles();
+
+// B. Swagger (Chỉ nên dùng trong Development, nhưng để đây cũng được)
 app.UseSwagger();
 app.UseSwaggerUI(c =>
 {
@@ -27,16 +44,17 @@ app.UseSwaggerUI(c =>
     c.RoutePrefix = "swagger";
 });
 
-// 4. TỰ ĐỘNG CHUYỂN HƯỚNG VỀ SWAGGER KHI VÀO TRANG CHỦ
+// C. CORS - Phải đặt TRƯỚC Routing và Authorization
+app.UseCors("AllowAll");
+
+app.UseHttpsRedirection();
+app.UseAuthorization();
+
+app.MapControllers();
+
 app.MapGet("/", context => {
     context.Response.Redirect("/swagger");
     return Task.CompletedTask;
 });
-
-// 5. QUAN TRỌNG: Tắt HttpsRedirection vì Somee Free thường chỉ chạy HTTP
-// app.UseHttpsRedirection(); 
-
-app.UseAuthorization();
-app.MapControllers();
 
 app.Run();

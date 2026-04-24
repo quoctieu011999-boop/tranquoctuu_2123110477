@@ -44,6 +44,27 @@ namespace tranquoctuu_2123110477.Controllers
             return order;
         }
 
+        // 👇 ĐOẠN CODE MỚI ĐƯỢC THÊM VÀO ĐÂY 👇
+        [HttpGet("customer/{customerId}")]
+        public async Task<ActionResult<IEnumerable<Order>>> GetCustomerOrders(int customerId)
+        {
+            var orders = await _context.Orders
+                                       .Include(o => o.OrderItems) // Load kèm chi tiết các món đã mua
+                                       .Where(o => o.CustomerId == customerId)
+                                       .OrderByDescending(o => o.CreatedAt) // Đơn mới nhất lên đầu
+                                       .AsNoTracking()
+                                       .ToListAsync();
+
+            // Nếu không có đơn nào, trả về mảng rỗng để frontend không bị lỗi
+            if (orders == null || !orders.Any())
+            {
+                return Ok(new List<Order>());
+            }
+
+            return Ok(orders);
+        }
+        // 👆 KẾT THÚC ĐOẠN CODE MỚI 👆
+
         [HttpPost]
         public async Task<ActionResult<Order>> PostOrder(Order order)
         {

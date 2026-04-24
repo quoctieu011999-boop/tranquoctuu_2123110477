@@ -10,45 +10,36 @@ namespace tranquoctuu_2123110477.Controllers
     public class ProductsController : ControllerBase
     {
         private readonly AppDbContext _context;
+        private readonly IWebHostEnvironment _env;
 
-        public ProductsController(AppDbContext context)
+        public ProductsController(AppDbContext context, IWebHostEnvironment env)
         {
             _context = context;
+            _env = env; // Tiêm vào để lấy đường dẫn thư mục wwwroot
         }
 
         // GET: api/Products
         [HttpGet]
         public async Task<ActionResult<IEnumerable<Product>>> GetAll()
         {
-            // Lấy toàn bộ danh sách sản phẩm chưa xóa, mới nhất lên đầu
             var list = await _context.Products
                 .Where(x => !x.IsDeleted)
                 .OrderByDescending(x => x.CreatedAt)
                 .ToListAsync();
-
             return Ok(list);
-        }
-
-        // GET: api/Products/5
-        [HttpGet("{id}")]
-        public async Task<ActionResult<Product>> GetById(int id)
-        {
-            var data = await _context.Products
-                .FirstOrDefaultAsync(x => x.Id == id && !x.IsDeleted);
-
-            if (data == null)
-            {
-                return NotFound($"Không tìm thấy sản phẩm với Id = {id}");
-            }
-
-            return Ok(data);
         }
 
         // POST: api/Products
         [HttpPost]
-        public async Task<ActionResult<Product>> Create(Product model)
+        public async Task<ActionResult<Product>> Create([FromForm] Product model, IFormFile? imageFile)
         {
             if (model == null) return BadRequest("Dữ liệu không hợp lệ");
+
+            // Xử lý Upload Ảnh
+            if (imageFile != null)
+            {
+                model.Image = await SaveImage(imageFile);
+            }
 
             model.CreatedAt = DateTime.Now;
             model.CreatedBy = "admin";
@@ -62,16 +53,14 @@ namespace tranquoctuu_2123110477.Controllers
 
         // PUT: api/Products/5
         [HttpPut("{id}")]
-        public async Task<IActionResult> Update(int id, Product model)
+        public async Task<IActionResult> Update(int id, [FromForm] Product model, IFormFile? imageFile)
         {
             if (id != model.Id) return BadRequest("Id không trùng khớp");
 
             var existing = await _context.Products.FindAsync(id);
+            if (existing == null || existing.IsDeleted) return NotFound();
 
-            if (existing == null || existing.IsDeleted)
-                return NotFound();
-
-            // Cập nhật các trường thông tin
+            // Cập nhật thông tin cơ bản
             existing.Name = model.Name;
             existing.Price = model.Price;
             existing.Stock = model.Stock;
@@ -79,16 +68,14 @@ namespace tranquoctuu_2123110477.Controllers
             existing.UpdatedAt = DateTime.Now;
             existing.UpdatedBy = "admin";
 
-            try
+            // Nếu có ảnh mới thì xóa ảnh cũ và lưu ảnh mới
+            if (imageFile != null)
             {
-                await _context.SaveChangesAsync();
-            }
-            catch (DbUpdateConcurrencyException)
-            {
-                if (!Exists(id)) return NotFound();
-                else throw;
+                DeleteImage(existing.Image); // Hàm xóa ảnh cũ
+                existing.Image = await SaveImage(imageFile);
             }
 
+            await _context.SaveChangesAsync();
             return NoContent();
         }
 
@@ -97,23 +84,50 @@ namespace tranquoctuu_2123110477.Controllers
         public async Task<IActionResult> Delete(int id)
         {
             var data = await _context.Products.FindAsync(id);
+            if (data == null || data.IsDeleted) return NotFound();
 
-            if (data == null || data.IsDeleted)
-                return NotFound();
-
-            // Thực hiện xóa mềm
             data.IsDeleted = true;
             data.DeletedAt = DateTime.Now;
             data.DeletedBy = "admin";
 
             await _context.SaveChangesAsync();
-
             return NoContent();
+        }
+
+        // --- Các hàm bổ trợ (Helper Methods) ---
+
+        private async Task<string> SaveImage(IFormFile file)
+        {
+            string fileName = Guid.NewGuid().ToString() + Path.GetExtension(file.FileName);
+            string path = Path.Combine(_env.WebRootPath, "images/products");
+
+            if (!Directory.Exists(path)) Directory.CreateDirectory(path);
+
+            string filePath = Path.Combine(path, fileName);
+            using (var stream = new FileStream(filePath, FileMode.Create))
+            {
+                await file.CopyToAsync(stream);
+            }
+            return fileName;
+        }
+
+        private void DeleteImage(string? fileName)
+        {
+            if (string.IsNullOrEmpty(fileName)) return;
+            string filePath = Path.Combine(_env.WebRootPath, "images/products", fileName);
+            if (System.IO.File.Exists(filePath)) System.IO.File.Delete(filePath);
         }
 
         private bool Exists(int id)
         {
             return _context.Products.Any(e => e.Id == id && !e.IsDeleted);
+        }
+
+        [HttpGet("{id}")]
+        public async Task<ActionResult<Product>> GetById(int id)
+        {
+            var data = await _context.Products.FirstOrDefaultAsync(x => x.Id == id && !x.IsDeleted);
+            return data == null ? NotFound() : Ok(data);
         }
     }
 }
